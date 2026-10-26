@@ -13,6 +13,7 @@ Run in this order, normally from one workflow:
 | method      | what it does                                                                                     | remote effect                           |
 | ----------- | ------------------------------------------------------------------------------------------------ | --------------------------------------- |
 | `collect`   | Snapshots the registry and builds the next issue from every version published or yanked in the window | reads the registry                      |
+| `classify`  | Measures each update's real code change and moves those below the threshold to "Minor updates" | downloads both versions of each update |
 | `summarize` | Summarizes each item and validates every summary                                                  | runs your summarizer command            |
 | `render`    | Renders the issue page, index, feed and Discord payload; `outDir` also writes them to disk for preview | none                                   |
 | `publish`   | Commits the site to `githubRepo`@`githubBranch` (default `gh-pages`) as one commit               | **only with `dryRun: false`**           |
@@ -31,6 +32,25 @@ latest version changed since the previous snapshot. Yanks don't move
 `updatedAt`, which is why the snapshot is needed. Extensions that vanish from
 the catalog are reported as removed, with the registry's yank or deprecation
 reason when it gives one.
+
+### Significant updates and minor updates
+
+Most weekly releases are version bumps. An update or pre-release gets a full
+line (and a summary) only when it is **significant**:
+
+- it adds or removes a method or resource, or the registry reports a
+  structural change (files, dependencies, labels), or
+- `classify` measures at least `minChangedLines` (default 10) changed lines of
+  code or config between the previous and the new version. Version strings
+  (any CalVer literal, the manifest `version:` line), lockfiles, generated or
+  vendored files and docs are ignored.
+
+Everything else is a **minor update**: never summarized, and shown according
+to `minorUpdates`: `list` (one compact section of names), `count` (only how
+many), or `drop` (not at all). An update that could not be measured (a failed
+download) stays significant, because hiding a release is worse than showing
+a bump. A family splits: members that really changed keep a family line, and
+its bumps become one minor line.
 
 ### Families
 
@@ -79,6 +99,8 @@ summarizer: command
 summarizerCommand:
   - /path/to/claude
   - "-p"
+  - "--model"
+  - claude-haiku-5-5         # pin a small model; the default may be the largest
   - "--tools"
   - ""                       # no tools at all
   - "--setting-sources"
@@ -88,6 +110,10 @@ summarizerCommand:
   - "--output-format"
   - json
 ```
+
+Pin `--model`. Without it, `claude -p` uses the account default (measured: the
+largest model). On a subscription, every call counts against the same usage
+limits as your interactive sessions.
 
 `--tools ""` alone is not enough if settings files are loaded: allow rules from
 user and project settings are merged with the command line. Keep
@@ -107,6 +133,12 @@ only if the model is offered zero tools, makes zero tool calls, the canary
 file is never created, and the production path either produces a clean
 summary or withholds it. `--negative-control` offers the model `Bash`, and the
 check must then **fail**.
+
+**Better: gate every run on it.** Claude Code updates itself, so a check that
+passed last week proves nothing about this week. `--command-json='[...]'`
+tests the exact deployed `summarizerCommand` (pass it from
+`swamp model get <name> --json`). Run it before the workflow and refuse to run
+if it fails or cannot run. It costs two small calls.
 
 `summarizer: none` (the default) needs no LLM. It builds summaries from
 registry metadata: the registry's own structural diff and the methods that
@@ -143,9 +175,18 @@ jobs:
           type: behavior
           behavior: digest
           methodName: collect
-      - name: summarize
+      - name: classify
         dependsOn:
           - step: collect
+            condition:
+              type: succeeded
+        task:
+          type: behavior
+          behavior: digest
+          methodName: classify
+      - name: summarize
+        dependsOn:
+          - step: classify
             condition:
               type: succeeded
         task:

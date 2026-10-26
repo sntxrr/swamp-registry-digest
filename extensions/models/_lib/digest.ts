@@ -244,7 +244,13 @@ export function candidates(
 // Entries
 // ---------------------------------------------------------------------------
 
-export type Section = "new" | "updated" | "prerelease" | "yanked" | "removed";
+export type Section =
+  | "new"
+  | "updated"
+  | "prerelease"
+  | "yanked"
+  | "removed"
+  | "minor";
 
 export interface Entry {
   section: Section;
@@ -267,6 +273,12 @@ export interface Entry {
   releaseNotes: string;
   /** Yank or removal reason, when there is one. */
   reason: string | null;
+  /**
+   * Changed lines of code and config between fromVersion and toVersion, with
+   * version strings, lockfiles, generated code and docs ignored. Null until
+   * `classify` measures it, or when it could not be measured.
+   */
+  changedLines: number | null;
 }
 
 export function familyOf(name: string): string | null {
@@ -302,6 +314,7 @@ export function entriesFor(
     repository: e.repository,
     repositoryVerified: e.repositoryVerified,
     reason: null,
+    changedLines: null,
   };
   // history is newest first; work oldest first for readability.
   const oldestFirst = [...history].reverse();
@@ -385,7 +398,27 @@ export function removedEntry(row: CatalogRow, reason: string | null): Entry {
     methodsRemoved: [],
     releaseNotes: "",
     reason,
+    changedLines: null,
   };
+}
+
+/** The registry or the method list says the shape of the extension changed. */
+export function isStructural(e: Entry): boolean {
+  return e.methodsAdded.length > 0 || e.methodsRemoved.length > 0 ||
+    e.registrySummary.trim().length > 0;
+}
+
+/**
+ * Whether an update or pre-release deserves a full line: it changed the API
+ * or structure, or it changed at least `minLines` lines of real code. An
+ * update whose size could not be measured stays significant, because hiding
+ * a release on a failed download is worse than showing a bump.
+ */
+export function isSignificant(e: Entry, minLines: number): boolean {
+  if (e.section !== "updated" && e.section !== "prerelease") return true;
+  if (isStructural(e)) return true;
+  if (e.changedLines === null) return true;
+  return e.changedLines >= minLines;
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +440,7 @@ export const SECTION_ORDER: Section[] = [
   "prerelease",
   "yanked",
   "removed",
+  "minor",
 ];
 
 /**

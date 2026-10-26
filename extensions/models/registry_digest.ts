@@ -4,11 +4,12 @@
  * short summary of each change. Rendered as a static site (dated issue pages,
  * an index and an RSS feed) and announced by Discord webhook.
  *
- * The pipeline is six methods, run in order by a workflow:
+ * The pipeline is seven methods, run in order by a workflow:
  *
  * | method      | reads                        | writes / touches                |
  * | ----------- | ---------------------------- | ------------------------------- |
  * | `collect`   | registry, cursor, catalog    | `issue`, pending catalog        |
+ * | `classify`  | `issue`, release archives    | `issue` (minor updates moved)   |
  * | `summarize` | `issue`, release archives    | `summaries`                     |
  * | `render`    | issue, summaries, archive    | `rendered` (+ files on disk)    |
  * | `publish`   | `rendered`                   | one commit on the Pages branch  |
@@ -49,6 +50,8 @@ import {
   entriesFor,
   type Entry,
   groupItems,
+  isSignificant,
+  isStructural,
   issueWindow,
   type Item,
   itemId,
@@ -58,6 +61,7 @@ import {
   toRows,
 } from "./_lib/digest.ts";
 import {
+  changedLineCount,
   type CodeDiff,
   DEFAULT_LIMITS,
   diffArchives,
@@ -135,6 +139,12 @@ const GlobalArgsSchema = z.object({
   familyDiffSample: z.number().int().min(0).default(2).describe(
     "How many members of a collapsed family get a code diff",
   ),
+  minChangedLines: z.number().int().min(0).default(10).describe(
+    "An update with no API or structural change needs at least this many changed lines of code or config (version strings, lockfiles, generated code and docs excluded) to get a full line; below it, it is a minor update",
+  ),
+  minorUpdates: z.enum(["list", "count", "drop"]).default("list").describe(
+    "How minor updates appear: `list` names them in one compact section, `count` shows only how many, `drop` leaves them out",
+  ),
   githubRepo: z.string().optional().describe(
     "owner/name of the Pages repository",
   ),
@@ -171,6 +181,7 @@ const EntrySchema = z.object({
   methodsRemoved: z.array(z.string()),
   releaseNotes: z.string(),
   reason: z.string().nullable(),
+  changedLines: z.number().nullable().default(null),
 });
 
 const ItemSchema = z.object({
@@ -194,6 +205,12 @@ const IssueSchema = z.object({
     removed: z.number(),
     optedOut: z.number(),
     firstRun: z.boolean(),
+    classified: z.object({
+      measured: z.number(),
+      minor: z.number(),
+      unmeasured: z.number(),
+      minChangedLines: z.number(),
+    }).optional(),
   }),
 });
 
@@ -494,6 +511,89 @@ export const model = {
       },
     },
 
+    classify: {
+      description:
+        "Measure each update's real code change and move those below the threshold (no API change, fewer than minChangedLines lines) to the minor section",
+      arguments: z.object({}),
+      execute: async (_args: Seams, ctx: Ctx) => {
+        const g = ctx.globalArgs;
+        const issue = await mustRead<Issue>(ctx, "issue", "collect");
+        const client = new RegistryClient(g.registryUrl, _args._fetch);
+        // Idempotent: a re-run restores minor entries to their real section first.
+        const entries = (issue.items as Item[]).flatMap((i) => i.entries).map((
+          e,
+        ) => ({
+          ...e,
+          section: e.section === "minor"
+            ? (e.channel === "stable" ? "updated" : "prerelease")
+            : e.section,
+        })) as Entry[];
+        // API and structural changes are significant without downloading anything.
+        const toMeasure = entries.filter((e) =>
+          (e.section === "updated" || e.section === "prerelease") &&
+          !isStructural(e) && e.fromVersion && e.toVersion
+        );
+        let unmeasured = 0;
+        await pool(toMeasure, 3, async (e) => {
+          try {
+            const [a, b] = await Promise.all([
+              client.download(e.name, e.fromVersion!, 10 * 1024 * 1024),
+              client.download(e.name, e.toVersion!, 10 * 1024 * 1024),
+            ]);
+            e.changedLines = changedLineCount(
+              await readArchive(a, DEFAULT_LIMITS),
+              await readArchive(b, DEFAULT_LIMITS),
+            );
+          } catch (err) {
+            e.changedLines = null;
+            unmeasured++;
+            ctx.logger.warn("Could not measure {name}: {err}", {
+              name: e.name,
+              err: String(err).slice(0, 200),
+            });
+          }
+        });
+        // One failed download keeps that entry visible; a registry outage fails loudly.
+        if (toMeasure.length >= 10 && unmeasured / toMeasure.length > 0.2) {
+          throw new Error(
+            `could not measure ${unmeasured} of ${toMeasure.length} updates; refusing to classify on partial data`,
+          );
+        }
+        let minor = 0;
+        for (const e of entries) {
+          if (!isSignificant(e, g.minChangedLines)) {
+            e.section = "minor";
+            minor++;
+          }
+        }
+        const items = groupItems(entries, g.familyThreshold);
+        const handle = await ctx.writeResource("issue", "issue", {
+          ...issue,
+          items,
+          counts: counts(items),
+          stats: {
+            ...issue.stats,
+            classified: {
+              measured: toMeasure.length - unmeasured,
+              minor,
+              unmeasured,
+              minChangedLines: g.minChangedLines,
+            },
+          },
+        });
+        ctx.logger.info(
+          "Classified {slug}: {m} measured, {minor} minor, {u} unmeasured",
+          {
+            slug: issue.slug,
+            m: toMeasure.length - unmeasured,
+            minor,
+            u: unmeasured,
+          },
+        );
+        return { dataHandles: [handle] };
+      },
+    },
+
     summarize: {
       description:
         "Summarize each item of the current issue, and validate every summary before keeping it",
@@ -519,7 +619,10 @@ export const model = {
             itemId(a).localeCompare(itemId(b))
           );
         for (const i of items) {
-          if (!describable.includes(i)) summaries[itemId(i)] = deterministic(i);
+          // Minor updates are never summarized: that is the point of them.
+          if (!describable.includes(i) && i.section !== "minor") {
+            summaries[itemId(i)] = deterministic(i);
+          }
         }
         const viaCommand = g.summarizer === "command"
           ? describable.slice(0, g.maxSummaries)
@@ -623,8 +726,14 @@ export const model = {
         outDir: z.string().optional().describe(
           "Absolute directory to also write the site files into (for previewing)",
         ),
+        minorUpdates: z.enum(["list", "count", "drop"]).optional().describe(
+          "Override the minorUpdates global argument for this render (previews)",
+        ),
       }),
-      execute: async (args: { outDir?: string }, ctx: Ctx) => {
+      execute: async (
+        args: { outDir?: string; minorUpdates?: "list" | "count" | "drop" },
+        ctx: Ctx,
+      ) => {
         const g = ctx.globalArgs;
         const issue = await mustRead<Issue>(ctx, "issue", "collect");
         const sums = await mustRead<Summaries>(ctx, "summaries", "summarize");
@@ -636,6 +745,10 @@ export const model = {
         const archive = (await read<Archive>(ctx, "archive"))?.issues ?? [];
         const cfg = siteConfig(g);
         const items = issue.items as Item[];
+        const opts = {
+          minorMode: args.minorUpdates ?? g.minorUpdates,
+          minChangedLines: g.minChangedLines,
+        };
         const meta = {
           slug: issue.slug,
           start: issue.start,
@@ -654,12 +767,19 @@ export const model = {
             meta,
             items,
             sums.summaries,
+            opts,
           ),
           "index.html": renderIndex(cfg, withThis),
           "feed.xml": renderFeed(cfg, withThis),
           ".nojekyll": "",
         };
-        const discord: DiscordPayload = renderDiscord(cfg, meta, items);
+        const discord: DiscordPayload = renderDiscord(
+          cfg,
+          meta,
+          items,
+          1900,
+          opts,
+        );
 
         if (args.outDir) {
           if (!args.outDir.startsWith("/")) {

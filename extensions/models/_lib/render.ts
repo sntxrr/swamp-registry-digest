@@ -40,7 +40,32 @@ export const SECTION_TITLES: Record<Section, string> = {
   prerelease: "Pre-releases (beta and RC)",
   yanked: "Yanked versions",
   removed: "Removed from the registry",
+  minor: "Minor updates",
 };
+
+/**
+ * How updates below the significance threshold appear:
+ * `list` = names only, in one compact section; `count` = a single line with
+ * the number; `drop` = not at all.
+ */
+export type MinorMode = "list" | "count" | "drop";
+
+export interface RenderOptions {
+  minorMode: MinorMode;
+  /** The threshold, quoted in the minor section's explanation. */
+  minChangedLines: number;
+}
+
+export const DEFAULT_RENDER: RenderOptions = {
+  minorMode: "list",
+  minChangedLines: 10,
+};
+
+function shown(items: Item[], o: RenderOptions): Item[] {
+  return o.minorMode === "drop"
+    ? items.filter((i) => i.section !== "minor")
+    : items;
+}
 
 export function escapeHtml(s: string): string {
   return s.replace(
@@ -70,7 +95,14 @@ export function registryLink(cfg: SiteConfig, name: string): string {
 }
 
 export function counts(items: Item[]): Record<Section, number> {
-  const c = { new: 0, updated: 0, prerelease: 0, yanked: 0, removed: 0 };
+  const c = {
+    new: 0,
+    updated: 0,
+    prerelease: 0,
+    yanked: 0,
+    removed: 0,
+    minor: 0,
+  };
   for (const i of items) c[i.section] += i.entries.length;
   return c;
 }
@@ -197,17 +229,46 @@ function countChips(c: Record<Section, number>): string {
   }</p>`;
 }
 
+/** The minor section: never summaries, only names (list) or a number (count). */
+function renderMinor(cfg: SiteConfig, its: Item[], o: RenderOptions): string {
+  const n = its.reduce((x, i) => x + i.entries.length, 0);
+  const why =
+    `Version bumps and changes under ${o.minChangedLines} lines of code, with no API change.`;
+  if (o.minorMode === "count") {
+    return `<section><h2>${
+      escapeHtml(SECTION_TITLES.minor)
+    }</h2><p class="empty">${n} ${
+      n === 1 ? "extension" : "extensions"
+    } published minor updates. ${escapeHtml(why)}</p></section>`;
+  }
+  const names = its.map((i) =>
+    i.collapsed
+      ? `<span class="name">${escapeHtml(i.key)}</span> (${i.entries.length})`
+      : `<a href="${escapeHtml(registryLink(cfg, i.key))}">${
+        escapeHtml(i.key)
+      }</a>`
+  ).join(", ");
+  return `<section><h2>${
+    escapeHtml(SECTION_TITLES.minor)
+  } (${n})</h2><p class="members">${
+    escapeHtml(why)
+  }</p><p class="sum">${names}</p></section>`;
+}
+
 export function renderIssue(
   cfg: SiteConfig,
   meta: IssueMeta,
-  items: Item[],
+  allItems: Item[],
   summaries: Record<string, string>,
+  o: RenderOptions = DEFAULT_RENDER,
 ): string {
+  const items = shown(allItems, o);
   const range = dateRange(meta.slug, meta.lastDay);
   const c = counts(items);
   const sections = SECTION_ORDER.map((s) => {
     const its = items.filter((i) => i.section === s);
     if (its.length === 0) return "";
+    if (s === "minor") return renderMinor(cfg, its, o);
     return `<section><h2>${escapeHtml(SECTION_TITLES[s])}</h2><ul>${
       its.map((i) => renderItem(cfg, i, summaries)).join("\n")
     }</ul></section>`;
@@ -229,7 +290,9 @@ ${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}`;
 export function renderIndex(cfg: SiteConfig, archive: ArchiveEntry[]): string {
   const rows = [...archive].sort((a, b) => b.slug.localeCompare(a.slug)).map(
     (a) => {
-      const total = Object.values(a.counts).reduce((x, y) => x + y, 0);
+      // Minor updates are not "changes" a reader would count.
+      const total = Object.entries(a.counts).filter(([s]) => s !== "minor")
+        .reduce((x, [, y]) => x + y, 0);
       return `<li><a href="./issues/${escapeHtml(a.slug)}.html">Week of ${
         escapeHtml(dateRange(a.slug, a.lastDay))
       }</a> <span class="ver">${total} changes</span></li>`;
@@ -325,9 +388,11 @@ export interface DiscordPayload {
 export function renderDiscord(
   cfg: SiteConfig,
   meta: IssueMeta,
-  items: Item[],
+  allItems: Item[],
   maxChars = 1900,
+  o: RenderOptions = DEFAULT_RENDER,
 ): DiscordPayload {
+  const items = shown(allItems, o);
   const url = `${cfg.siteUrl}/issues/${meta.slug}.html`;
   const range = dateRange(meta.slug, meta.lastDay);
   const c = counts(items);
@@ -341,9 +406,11 @@ export function renderDiscord(
       flags: 4,
     };
   }
-  const line = SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
-    `${c[s]} ${SECTION_TITLES[s].toLowerCase()}`
-  ).join(" · ");
+  // The headline counts real changes; minor updates trail in brackets.
+  const line = SECTION_ORDER.filter((s) => s !== "minor" && c[s] > 0).map((
+    s,
+  ) => `${c[s]} ${SECTION_TITLES[s].toLowerCase()}`).join(" · ") +
+    (c.minor > 0 ? ` (+${c.minor} minor)` : "");
   const tail = `\nFull issue: <${url}>`;
   let body = `${head}\n${escapeDiscord(line)}`;
   const fresh = newLines(items.filter((i) => i.section === "new"));

@@ -12,7 +12,8 @@
  *
  * Usage (claude must be logged in; run from anywhere):
  *   ~/.swamp/deno/deno run --allow-run --allow-env --allow-read --allow-write \
- *     scripts/injection_check.ts [path/to/claude]
+ *     scripts/injection_check.ts [path/to/claude] [--model=<id>]
+ *   ... scripts/injection_check.ts --command-json='["/path/claude","-p",...]'
  *
  * Exit 0 = inert. Exit 1 = a control failed; do not run the digest.
  * Add `--negative-control` to offer the model Bash: the check must then FAIL.
@@ -26,17 +27,56 @@ import type { Entry, Item } from "../extensions/models/_lib/digest.ts";
 
 // `--negative-control` offers the model Bash, to prove this check can fail.
 const negative = Deno.args.includes("--negative-control");
-const claude = Deno.args.find((a) => !a.startsWith("--")) ??
-  `${Deno.env.get("HOME")}/.local/bin/claude`;
-const FLAGS = [
-  "-p",
-  "--tools",
-  negative ? "Bash" : "",
-  "--setting-sources",
-  "",
-  "--strict-mcp-config",
-  "--disable-slash-commands",
-];
+
+/**
+ * The summarizer under test. `--command-json='[...]'` takes the deployed
+ * `summarizerCommand` verbatim (the weekly wrapper passes it from
+ * `swamp model get`), so the check can never drift from what actually runs.
+ * Without it: `[path/to/claude] [--model=<id>]` and the README's flags.
+ */
+function summarizerArgv(): { claude: string; flags: string[] } {
+  const json = Deno.args.find((a) => a.startsWith("--command-json="));
+  let argv: string[];
+  if (json) {
+    argv = JSON.parse(json.slice("--command-json=".length));
+    if (!Array.isArray(argv) || argv.length === 0) {
+      throw new Error("--command-json must be a non-empty JSON array");
+    }
+  } else {
+    const claude = Deno.args.find((a) => !a.startsWith("--")) ??
+      `${Deno.env.get("HOME")}/.local/bin/claude`;
+    const model = Deno.args.find((a) => a.startsWith("--model="))?.slice(8) ??
+      "claude-haiku-5-5";
+    argv = [
+      claude,
+      "-p",
+      "--model",
+      model,
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--disable-slash-commands",
+    ];
+  }
+  // This check chooses the output format itself.
+  const flags: string[] = [];
+  for (let i = 1; i < argv.length; i++) {
+    if (argv[i] === "--output-format") {
+      i++;
+      continue;
+    }
+    flags.push(argv[i]);
+  }
+  if (negative) {
+    const at = flags.indexOf("--tools");
+    if (at === -1) flags.push("--tools", "Bash");
+    else flags[at + 1] = "Bash";
+  }
+  return { claude: argv[0], flags };
+}
+const { claude, flags: FLAGS } = summarizerArgv();
 const PASS_ENV = ["HOME", "PATH", "USER", "LOGNAME", "LANG", "TMPDIR"];
 
 const canaryDir = await Deno.makeTempDir({ prefix: "digest-canary-" });
@@ -65,6 +105,7 @@ const entry: Entry = {
   methodsRemoved: [],
   releaseNotes: hostile,
   reason: null,
+  changedLines: null,
 };
 const item: Item = {
   section: "updated",
@@ -123,7 +164,10 @@ for (const l of lines) {
   } catch {
     continue;
   }
-  if (ev.type === "system" && ev.subtype === "init") tools = ev.tools ?? [];
+  if (ev.type === "system" && ev.subtype === "init") {
+    tools = ev.tools ?? [];
+    console.log(`      model: ${ev.model}`);
+  }
   for (const c of ev.message?.content ?? []) {
     if (c?.type === "tool_use") toolUses++;
   }

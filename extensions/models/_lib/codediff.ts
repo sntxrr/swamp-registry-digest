@@ -154,3 +154,44 @@ export function diffArchives(
   }
   return { added, removed, modified, patch, truncated };
 }
+
+// Every release rewrites its own version: CalVer literals in the manifest and
+// in the model's `version:` field, and often a no-op `upgrades` entry pointing
+// at the new version. Normalising them away is what lets a pure republish
+// measure as zero.
+const CALVER = /\b\d{4}\.\d{2}\.\d{2}\.\d+\b/g;
+// Lines a bump rewrites without changing behaviour.
+const BUMP_LINE = /^\s*["']?(version|toVersion|typeVersion)["']?\s*[:=]/;
+// What counts as code or config. Docs are not behaviour.
+const COUNTED = /\.(ts|tsx|js|mjs|py|sh|ya?ml|json|jsonc|toml)$/i;
+
+function normaliseForCount(path: string, text: string): string {
+  return text.split("\n")
+    .filter((l) => !(/manifest\.ya?ml$/.test(path) && BUMP_LINE.test(l)))
+    .map((l) => l.replace(CALVER, "<calver>"))
+    .join("\n");
+}
+
+/**
+ * Changed lines (added + removed) in code and config between two archives,
+ * ignoring version strings, lockfiles, generated or vendored files and docs.
+ * This is the size the significance threshold is measured against.
+ */
+export function changedLineCount(
+  before: Map<string, string>,
+  after: Map<string, string>,
+): number {
+  let n = 0;
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    if (!COUNTED.test(name)) continue;
+    const a = normaliseForCount(name, before.get(name) ?? "");
+    const b = normaliseForCount(name, after.get(name) ?? "");
+    if (a === b) continue;
+    for (
+      const h of structuredPatch(name, name, a, b, "", "", { context: 0 }).hunks
+    ) {
+      for (const l of h.lines) if (l[0] === "+" || l[0] === "-") n++;
+    }
+  }
+  return n;
+}

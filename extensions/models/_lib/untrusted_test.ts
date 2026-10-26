@@ -49,6 +49,7 @@ function entry(over: Partial<Entry> = {}): Entry {
     methodsRemoved: [],
     releaseNotes: "",
     reason: null,
+    changedLines: null,
     ...over,
   };
 }
@@ -277,4 +278,28 @@ Deno.test("archive reader refuses a decompression bomb", async () => {
 Deno.test("path traversal names are just map keys; nothing touches disk", async () => {
   const files = await readArchive(await tgz({ "../../etc/evil.ts": "x" }));
   assertEquals([...files.keys()].length, 1);
+});
+
+Deno.test("minor modes: list names them, count only counts, drop hides them", async () => {
+  const { renderIssue, renderDiscord } = await import("./render.ts");
+  const items: Item[] = [
+    item(entry({ section: "updated", name: "@real/change" })),
+    {
+      section: "minor",
+      key: "@bump/one",
+      collapsed: false,
+      entries: [entry({ section: "minor", name: "@bump/one" })],
+    },
+  ];
+  const html = (m: "list" | "count" | "drop") =>
+    renderIssue(CFG, META, items, {}, { minorMode: m, minChangedLines: 10 });
+  assertStringIncludes(html("list"), "@bump/one");
+  assertFalse(html("count").includes("@bump/one"));
+  assertStringIncludes(html("count"), "1 extension published minor updates");
+  assertFalse(html("drop").includes("Minor updates"));
+  const d = (m: "list" | "count" | "drop") =>
+    renderDiscord(CFG, META, items, 1900, { minorMode: m, minChangedLines: 10 })
+      .content;
+  assertStringIncludes(d("list"), "1 updated (+1 minor)");
+  assertFalse(d("drop").includes("minor"));
 });
