@@ -303,3 +303,14 @@ Deno.test("minor modes: list names them, count only counts, drop hides them", as
   assertStringIncludes(d("list"), "1 updated (+1 minor)");
   assertFalse(d("drop").includes("minor"));
 });
+
+Deno.test("compiled per-kind bundles and generated audit files are skipped", async () => {
+  const f = await readArchive(
+    await tgz({
+      "extension/datastore-bundles/x/mod.js": "compiled",
+      "extension/dependency-audit.json": "{}",
+      "extension/datastores/x/mod.ts": "source",
+    }),
+  );
+  assertEquals([...f.keys()], ["extension/datastores/x/mod.ts"]);
+});

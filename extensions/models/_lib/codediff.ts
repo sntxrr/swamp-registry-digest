@@ -26,8 +26,10 @@ export const DEFAULT_LIMITS: ArchiveLimits = {
 
 const TEXT_EXT = /\.(ts|tsx|js|mjs|json|jsonc|ya?ml|md|txt|toml|sh|py)$/i;
 // Generated or vendored content says nothing about intent and eats the budget.
+// Matches `bundles/`, `.bundle/` and per-kind dirs like `datastore-bundles/`,
+// which hold compiled copies of the source.
 const SKIP =
-  /(^|\/)(deno\.lock|package-lock\.json|node_modules\/|\.bundle\/|bundles?\/|vendor\/)|\.min\.js$|\.js\.map$/;
+  /(^|\/)(deno\.lock|package-lock\.json|dependency-audit\.json|node_modules\/|\.bundle\/|[a-z-]*bundles?\/|vendor\/)|\.min\.js$|\.js\.map$/;
 
 /** Path inside the archive, normalised: no leading `./` or `package/`. */
 function normalise(path: string): string {
@@ -165,11 +167,22 @@ const BUMP_LINE = /^\s*["']?(version|toVersion|typeVersion)["']?\s*[:=]/;
 // What counts as code or config. Docs are not behaviour.
 const COUNTED = /\.(ts|tsx|js|mjs|py|sh|ya?ml|json|jsonc|toml)$/i;
 
+// A dependency bump in an import specifier (`npm:zod@4.3.6` -> `@4.6.7`) is
+// not a code change; the registry reports declared dependency changes itself.
+const IMPORT_VERSION = /((?:npm|jsr):@?[\w./-]+)@[\w.+-]+/g;
+// A no-op upgrade entry, added by every bump of a model's version:
+// `{ toVersion: "...", description: "...", upgradeAttributes: (old) => old }`.
+const IDENTITY_UPGRADE =
+  /[ \t]*\{\s*toVersion:\s*["']<calver>["'],\s*description:(?:(?!upgradeAttributes)[\s\S])*?upgradeAttributes:\s*\(\s*(\w+)[^)]*\)\s*=>\s*\1\s*,?\s*\},?[ \t]*\n?/g;
+
 function normaliseForCount(path: string, text: string): string {
   return text.split("\n")
     .filter((l) => !(/manifest\.ya?ml$/.test(path) && BUMP_LINE.test(l)))
-    .map((l) => l.replace(CALVER, "<calver>"))
-    .join("\n");
+    .map((l) =>
+      l.replace(CALVER, "<calver>").replace(IMPORT_VERSION, "$1@<ver>")
+    )
+    .join("\n")
+    .replace(IDENTITY_UPGRADE, "");
 }
 
 /**

@@ -87,3 +87,54 @@ Deno.test("a family splits: real changes stay in updated, bumps go to minor", ()
     ["minor", "@swamp/cf", 5],
   ]);
 });
+
+Deno.test("dependency bumps in import specifiers do not count", () => {
+  const a = files({
+    "x.ts":
+      'import { z } from "npm:zod@4.3.6";\nimport { C } from "npm:@aws-sdk/client-cloudcontrol@3.1147.0";\n',
+  });
+  const b = files({
+    "x.ts":
+      'import { z } from "npm:zod@4.6.7";\nimport { C } from "npm:@aws-sdk/client-cloudcontrol@3.1156.0";\n',
+  });
+  assertEquals(changedLineCount(a, b), 0);
+});
+
+Deno.test("a no-op upgrade entry added by a bump does not count; a real one does", () => {
+  const head = "export const model = {\n  upgrades: [\n";
+  const tail = "  ],\n};\n";
+  const old =
+    '    {\n      toVersion: "2026.10.01.1",\n      description: "Initial",\n      upgradeAttributes: (old) => old,\n    },\n';
+  const noop =
+    '    {\n      toVersion: "2026.10.20.1",\n      description: "No schema changes",\n      upgradeAttributes: (old) => old,\n    },\n';
+  const real =
+    '    {\n      toVersion: "2026.10.20.1",\n      description: "Rename host",\n      upgradeAttributes: (old) => ({ ...old, url: old.host }),\n    },\n';
+  assertEquals(
+    changedLineCount(
+      files({ "x.ts": head + old + tail }),
+      files({ "x.ts": head + old + noop + tail }),
+    ),
+    0,
+  );
+  assert(
+    changedLineCount(
+      files({ "x.ts": head + old + tail }),
+      files({ "x.ts": head + old + real + tail }),
+    ) > 0,
+  );
+});
+
+Deno.test("a real upgrade followed by a no-op one is still counted", () => {
+  const head = "export const model = {\n  upgrades: [\n";
+  const tail = "  ],\n};\n";
+  const real =
+    '    {\n      toVersion: "2026.10.20.1",\n      description: "Rename host",\n      upgradeAttributes: (old) => ({ ...old, url: old.host }),\n    },\n';
+  const noop =
+    '    {\n      toVersion: "2026.10.21.1",\n      description: "No schema changes",\n      upgradeAttributes: (old) => old,\n    },\n';
+  assert(
+    changedLineCount(
+      files({ "x.ts": head + tail }),
+      files({ "x.ts": head + real + noop + tail }),
+    ) >= 4,
+  );
+});
