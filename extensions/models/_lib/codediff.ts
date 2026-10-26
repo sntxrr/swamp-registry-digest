@@ -1,0 +1,210 @@
+/**
+ * Text diff between two extension archives.
+ *
+ * Archives are third-party input. They are unpacked in memory only: nothing is
+ * written to disk, so a hostile path (`../../x`) has nowhere to land. Both the
+ * decompressed total and each file are capped, so a gzip bomb fails the one
+ * entry instead of the run.
+ *
+ * @module
+ */
+
+import { UntarStream } from "jsr:@std/tar@0.1.10/untar-stream";
+import { structuredPatch } from "npm:diff@9.0.0";
+
+export interface ArchiveLimits {
+  /** Cap on decompressed bytes read from one archive. */
+  maxTotalBytes: number;
+  /** Files larger than this are listed as changed but not diffed. */
+  maxFileBytes: number;
+}
+
+export const DEFAULT_LIMITS: ArchiveLimits = {
+  maxTotalBytes: 20 * 1024 * 1024,
+  maxFileBytes: 256 * 1024,
+};
+
+const TEXT_EXT = /\.(ts|tsx|js|mjs|json|jsonc|ya?ml|md|txt|toml|sh|py)$/i;
+// Generated or vendored content says nothing about intent and eats the budget.
+// Matches `bundles/`, `.bundle/` and per-kind dirs like `datastore-bundles/`,
+// which hold compiled copies of the source.
+const SKIP =
+  /(^|\/)(deno\.lock|package-lock\.json|dependency-audit\.json|node_modules\/|\.bundle\/|[a-z-]*bundles?\/|vendor\/)|\.min\.js$|\.js\.map$/;
+
+/** Path inside the archive, normalised: no leading `./` or `package/`. */
+function normalise(path: string): string {
+  return path.replace(/^\.?\//, "").replace(/^package\//, "");
+}
+
+/** Unpack a `.tar.gz` into a map of text files. */
+export async function readArchive(
+  bytes: Uint8Array,
+  limits: ArchiveLimits = DEFAULT_LIMITS,
+): Promise<Map<string, string>> {
+  let total = 0;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, ctl) {
+      total += chunk.byteLength;
+      if (total > limits.maxTotalBytes) {
+        ctl.error(
+          new Error(`archive decompresses past ${limits.maxTotalBytes} bytes`),
+        );
+        return;
+      }
+      ctl.enqueue(chunk);
+    },
+  });
+  const files = new Map<string, string>();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  const stream = new Blob([bytes as BlobPart]).stream()
+    .pipeThrough(new DecompressionStream("gzip"))
+    .pipeThrough(counter)
+    .pipeThrough(new UntarStream());
+  for await (const entry of stream) {
+    const path = normalise(entry.path);
+    const keep = entry.readable && TEXT_EXT.test(path) && !SKIP.test(path) &&
+      entry.header.size <= limits.maxFileBytes;
+    if (!keep) {
+      await entry.readable?.cancel();
+      if (entry.readable && TEXT_EXT.test(path) && !SKIP.test(path)) {
+        files.set(
+          path,
+          `<<file too large to diff: ${entry.header.size} bytes>>`,
+        );
+      }
+      continue;
+    }
+    const buf = new Uint8Array(
+      await new Response(entry.readable).arrayBuffer(),
+    );
+    files.set(path, decoder.decode(buf));
+  }
+  return files;
+}
+
+export interface CodeDiff {
+  added: string[];
+  removed: string[];
+  modified: string[];
+  /** Unified hunks, truncated to the budget. */
+  patch: string;
+  truncated: boolean;
+}
+
+/**
+ * Unified diff of two file maps, capped at `budget` characters.
+ *
+ * Manifest and source files go first, docs last, so a tight budget still
+ * shows what the code does.
+ */
+export function diffArchives(
+  before: Map<string, string>,
+  after: Map<string, string>,
+  budget: number,
+): CodeDiff {
+  const names = [...new Set([...before.keys(), ...after.keys()])];
+  const rank = (p: string) =>
+    /manifest\.ya?ml$/.test(p)
+      ? 0
+      : /\.(ts|tsx|js|mjs|py|sh)$/.test(p)
+      ? 1
+      : /\.md$/.test(p)
+      ? 3
+      : 2;
+  names.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  const modified: string[] = [];
+  let patch = "";
+  let truncated = false;
+
+  for (const name of names) {
+    const a = before.get(name);
+    const b = after.get(name);
+    if (a === b) continue;
+    if (a === undefined) added.push(name);
+    else if (b === undefined) removed.push(name);
+    else modified.push(name);
+
+    if (truncated) continue;
+    const p = structuredPatch(
+      `a/${name}`,
+      `b/${name}`,
+      a ?? "",
+      b ?? "",
+      "",
+      "",
+      {
+        context: 2,
+      },
+    );
+    let text = `--- a/${name}\n+++ b/${name}\n`;
+    for (const h of p.hunks) {
+      text +=
+        `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@\n${
+          h.lines.join("\n")
+        }\n`;
+    }
+    if (patch.length + text.length > budget) {
+      const room = budget - patch.length;
+      if (room > 200) patch += text.slice(0, room) + "\n<<truncated>>\n";
+      truncated = true;
+      continue;
+    }
+    patch += text;
+  }
+  return { added, removed, modified, patch, truncated };
+}
+
+// Every release rewrites its own version: CalVer literals in the manifest and
+// in the model's `version:` field, and often a no-op `upgrades` entry pointing
+// at the new version. Normalising them away is what lets a pure republish
+// measure as zero.
+const CALVER = /\b\d{4}\.\d{2}\.\d{2}\.\d+\b/g;
+// Lines a bump rewrites without changing behaviour.
+const BUMP_LINE = /^\s*["']?(version|toVersion|typeVersion)["']?\s*[:=]/;
+// What counts as code or config. Docs are not behaviour.
+const COUNTED = /\.(ts|tsx|js|mjs|py|sh|ya?ml|json|jsonc|toml)$/i;
+
+// A dependency bump in an import specifier (`npm:zod@4.3.6` -> `@4.6.7`) is
+// not a code change; the registry reports declared dependency changes itself.
+const IMPORT_VERSION = /((?:npm|jsr):@?[\w./-]+)@[\w.+-]+/g;
+// A no-op upgrade entry, added by every bump of a model's version:
+// `{ toVersion: "...", description: "...", upgradeAttributes: (old) => old }`.
+const IDENTITY_UPGRADE =
+  /[ \t]*\{\s*toVersion:\s*["']<calver>["'],\s*description:(?:(?!upgradeAttributes)[\s\S])*?upgradeAttributes:\s*\(\s*(\w+)[^)]*\)\s*=>\s*\1\s*,?\s*\},?[ \t]*\n?/g;
+
+function normaliseForCount(path: string, text: string): string {
+  return text.split("\n")
+    .filter((l) => !(/manifest\.ya?ml$/.test(path) && BUMP_LINE.test(l)))
+    .map((l) =>
+      l.replace(CALVER, "<calver>").replace(IMPORT_VERSION, "$1@<ver>")
+    )
+    .join("\n")
+    .replace(IDENTITY_UPGRADE, "");
+}
+
+/**
+ * Changed lines (added + removed) in code and config between two archives,
+ * ignoring version strings, lockfiles, generated or vendored files and docs.
+ * This is the size the significance threshold is measured against.
+ */
+export function changedLineCount(
+  before: Map<string, string>,
+  after: Map<string, string>,
+): number {
+  let n = 0;
+  for (const name of new Set([...before.keys(), ...after.keys()])) {
+    if (!COUNTED.test(name)) continue;
+    const a = normaliseForCount(name, before.get(name) ?? "");
+    const b = normaliseForCount(name, after.get(name) ?? "");
+    if (a === b) continue;
+    for (
+      const h of structuredPatch(name, name, a, b, "", "", { context: 0 }).hunks
+    ) {
+      for (const l of h.lines) if (l[0] === "+" || l[0] === "-") n++;
+    }
+  }
+  return n;
+}
