@@ -73,6 +73,9 @@ Two optional sources, each off until its argument is set:
   window are read from their schema.org `PodcastEpisode` JSON-LD and linked,
   with their YouTube video when the page has one.
 
+Both sections appear above the registry sections, and the Discord
+announcement gets one `Podcast:` line per episode.
+
 If a source cannot be read, the issue says "could not be read this week" and
 still goes out; the error is kept in the `community` data (`errors`) so the
 caller can alert on it. Videos and episodes are links, never embeds: the page

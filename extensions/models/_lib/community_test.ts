@@ -10,6 +10,7 @@ import {
 import {
   type Community,
   NO_COMMUNITY,
+  renderDiscord,
   renderIssue,
   renderIssueJson,
   renderLlmsTxt,
@@ -317,4 +318,81 @@ Deno.test("llms.txt points at the JSON copies", () => {
   assert(t.startsWith("# LWIS\n\n> "));
   assert(t.includes("(https://site.test/index.json)"));
   assert(t.includes("(https://site.test/issues/2026-10-19.json)"));
+});
+
+const ITEM = {
+  section: "new" as const,
+  key: "@a/thing",
+  collapsed: false,
+  entries: [{
+    section: "new" as const,
+    name: "@a/thing",
+    family: null,
+    fromVersion: null,
+    toVersion: "2026.10.20.1",
+    channel: "stable",
+    versions: ["2026.10.20.1"],
+    description: "Thing.",
+    labels: [],
+    repository: null,
+    repositoryVerified: false,
+    registrySummary: "",
+    methodsAdded: [],
+    methodsRemoved: [],
+    releaseNotes: "",
+    reason: null,
+    changedLines: null,
+  }],
+};
+
+const EPISODE: Community = {
+  podcast: {
+    configured: true,
+    ok: true,
+    error: null,
+    items: [{
+      title: "Ep **12** @everyone [x](https://evil.test)",
+      episodeNumber: 12,
+      date: "2026-10-19",
+      url: "https://club.test/podcast/2026-10-19",
+      description: "",
+      videoUrl: null,
+    }],
+  },
+  feed: NO_COMMUNITY.feed,
+};
+
+Deno.test("issue page: community sections come before the registry sections", () => {
+  const html = renderIssue(
+    CFG,
+    META,
+    [ITEM as never],
+    {},
+    undefined,
+    [],
+    EPISODE,
+  );
+  const pod = html.indexOf("<h2>Podcast</h2>");
+  const reg = html.indexOf("<h2>New extensions</h2>");
+  assert(pod > 0 && reg > pod);
+});
+
+Deno.test("Discord: one escaped podcast line, none when unavailable or unconfigured", () => {
+  const p = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, EPISODE);
+  assert(
+    p.content.includes(
+      "\nPodcast: Ep \\*\\*12\\*\\* @everyone \\[x\\](https://evil.test) <https://club.test/podcast/2026-10-19>",
+    ),
+  );
+  assertEquals(p.allowed_mentions.parse, []);
+  const quiet = renderDiscord(CFG, META, [], 1900, undefined, EPISODE);
+  assert(quiet.content.includes("Nothing new this week.\nPodcast: "));
+  const down = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, {
+    ...EPISODE,
+    podcast: { ...EPISODE.podcast, ok: false },
+  });
+  assert(!down.content.includes("Podcast"));
+  assert(
+    !renderDiscord(CFG, META, [ITEM as never]).content.includes("Podcast"),
+  );
 });

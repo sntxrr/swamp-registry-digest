@@ -396,8 +396,8 @@ export function renderIssue(
   const body = `${nav}<header>
 <h1>Week of ${escapeHtml(range)}</h1>
 ${items.length ? countChips(c) : ""}</header>
-${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}
 ${renderCommunity(community)}
+${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}
 ${earlierList}`;
   const head = `<link rel="alternate" type="application/json" href="${
     escapeHtml(issueUrl(cfg, meta.slug, "json"))
@@ -538,6 +538,7 @@ export function renderDiscord(
   allItems: Item[],
   maxChars = 1900,
   o: RenderOptions = DEFAULT_RENDER,
+  community: Community = NO_COMMUNITY,
 ): DiscordPayload {
   const items = shown(allItems, o);
   const url = `${cfg.siteUrl}/issues/${meta.slug}.html`;
@@ -546,9 +547,20 @@ export function renderDiscord(
   const head = `**${escapeDiscord(cfg.title)}: week of ${
     escapeDiscord(range)
   }**`;
+  // One line per episode. The title is third-party: escaped and capped; the
+  // URL was pinned to the podcast's own site by the reader, and angle
+  // brackets keep Discord from embedding it.
+  const podcast = community.podcast.ok
+    ? community.podcast.items.flatMap((e) => {
+      const u = safeUrl(e.url);
+      return u
+        ? [`\nPodcast: ${escapeDiscord(e.title.slice(0, 120))} <${u}>`]
+        : [];
+    }).join("")
+    : "";
   if (items.length === 0) {
     return {
-      content: `${head}\nNothing new this week.\n<${url}>`,
+      content: `${head}\nNothing new this week.${podcast}\n<${url}>`,
       allowed_mentions: { parse: [] },
       flags: 4,
     };
@@ -559,7 +571,7 @@ export function renderDiscord(
   ) => `${c[s]} ${SECTION_TITLES[s].toLowerCase()}`).join(" · ") +
     (c.minor > 0 ? ` (+${c.minor} minor)` : "");
   const tail = `\nFull issue: <${url}>`;
-  let body = `${head}\n${escapeDiscord(line)}`;
+  let body = `${head}\n${escapeDiscord(line)}${podcast}`;
   const fresh = newLines(items.filter((i) => i.section === "new"));
   if (fresh.length) {
     body += "\n\n**New**";

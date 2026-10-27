@@ -926,6 +926,7 @@ export const model = {
           items,
           1900,
           opts,
+          community,
         );
 
         if (args.outDir) {
