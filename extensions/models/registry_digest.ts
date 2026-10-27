@@ -118,7 +118,7 @@ const GlobalArgsSchema = z.object({
   familyThreshold: z.number().int().min(2).default(3).describe(
     "Collapse a family (`@collective/group/*`) into one line once this many members changed in one section",
   ),
-  siteTitle: z.string().default("Last Week in Swamp"),
+  siteTitle: z.string().default("Last Week in Swamp Club"),
   siteUrl: z.string().url().describe(
     "Public base URL of the published site, e.g. https://lastweekinswamp.club",
   ),

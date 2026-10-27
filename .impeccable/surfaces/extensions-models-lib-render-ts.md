@@ -7,7 +7,7 @@ related_targets: []
 
 ## Scope
 
-The Last Week in Swamp site: issue pages and the index, rendered by `extensions/models/_lib/render.ts`. Mode: **Read**. Build path: code-led (Read surface).
+The Last Week in Swamp Club site: issue pages and the index, rendered by `extensions/models/_lib/render.ts`. Mode: **Read**. Build path: code-led (Read surface).
 
 ## Audience and job
 

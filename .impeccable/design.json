@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-10-27T02:39:17+00:00",
-  "title": "Design System: Last Week in Swamp",
+  "title": "Design System: Last Week in Swamp Club",
   "extensions": {
     "colorMeta": {
       "dusk": {
@@ -408,7 +408,7 @@
       "kind": "custom",
       "refersTo": "masthead-site-name",
       "description": "Lantern site name and tagline over the dusk scrim at the base of the artwork banner (art omitted here; scrim shown on dusk).",
-      "html": "<div class=\"ds-art\"><div class=\"ds-title\"><p class=\"ds-site\"><a href=\"#\">Last Week in Swamp</a></p><p class=\"ds-tagline\">Each week in swamp: new and updated extensions, the podcast, and Swamp Club posts.</p></div></div>",
+      "html": "<div class=\"ds-art\"><div class=\"ds-title\"><p class=\"ds-site\"><a href=\"#\">Last Week in Swamp Club</a></p><p class=\"ds-tagline\">Each week in swamp: new and updated extensions, the podcast, and Swamp Club posts.</p></div></div>",
       "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-art{position:relative;height:12.5rem;background:linear-gradient(to top,var(--dusk) 0,rgb(11 42 38/.8) 13%,rgb(11 42 38/0) 42%),linear-gradient(160deg,#1d4a3f,#6b4a2a);font-family:var(--text)} .ds-title{position:absolute;left:1.25rem;right:1.25rem;bottom:0;padding-bottom:.9rem} .ds-site{font:700 clamp(1.75rem,5vw,3.25rem)/1 var(--display);letter-spacing:-.025em;margin:0;color:var(--lantern)} .ds-site a{color:inherit;text-decoration:none} .ds-site a:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px} .ds-tagline{margin:.4rem 0 0;color:var(--dusk-ink-2);font-size:.95rem}"
     },
     {
