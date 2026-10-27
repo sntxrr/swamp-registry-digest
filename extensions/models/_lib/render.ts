@@ -27,6 +27,31 @@ export interface SiteConfig {
   siteUrl: string;
   registryUrl: string;
   disclaimer: string;
+  theme?: SiteTheme;
+}
+
+/**
+ * Optional site art, as paths relative to the site root (files the site
+ * itself serves: the page CSP allows images and fonts from 'self' only).
+ */
+export interface SiteTheme {
+  /** Masthead banner, wide (about 1600 px). */
+  banner?: string;
+  /** The same banner for narrow screens (about 800 px). */
+  bannerSmall?: string;
+  /** Intrinsic size of the banner, for layout without a reflow. */
+  bannerWidth?: number;
+  bannerHeight?: number;
+  bannerAlt?: string;
+  /** WOFF2 display face for the masthead and headings. */
+  displayFont?: string;
+}
+
+const SITE_PATH_RE = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/i;
+
+/** A site-relative asset path, or null when it is not a plain relative path. */
+export function sitePath(p: string | undefined): string | null {
+  return p && SITE_PATH_RE.test(p) && !p.includes("..") ? p : null;
 }
 
 export interface ArchiveEntry {
@@ -139,24 +164,86 @@ export function dateRange(firstDay: string, lastDay: string): string {
   return `${fmt(firstDay, false)} – ${fmt(lastDay, true)}`;
 }
 
-const STYLE = `
-:root{--bg:#fbfaf7;--fg:#1d1f1c;--muted:#5d625a;--rule:#dcdad2;--accent:#2f6b4f;--chip:#eef0ea}
-@media (prefers-color-scheme:dark){:root{--bg:#141613;--fg:#e6e8e2;--muted:#9ba196;--rule:#2c302a;--accent:#7cc39c;--chip:#1f231e}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:46rem;margin:0 auto;padding:2.5rem 1rem 4rem}
-header p{color:var(--muted);margin:.25rem 0 0}h1{font-size:1.75rem;margin:0;letter-spacing:-.01em}
-h2{font-size:1.1rem;margin:2.25rem 0 .5rem;padding-bottom:.35rem;border-bottom:1px solid var(--rule)}
-a{color:var(--accent)}ul{list-style:none;padding:0;margin:0}
-li{padding:.7rem 0;border-bottom:1px solid var(--rule)}li:last-child{border-bottom:0}
-.name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92rem;font-weight:600;overflow-wrap:anywhere}
-.ver{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;color:var(--muted)}
-.sum{margin:.25rem 0 0}.members{color:var(--muted);font-size:.85rem;margin:.3rem 0 0;overflow-wrap:anywhere}
-.counts{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0 0;padding:0}
-.counts span{background:var(--chip);border-radius:999px;padding:.15rem .65rem;font-size:.85rem}
-footer{margin-top:3rem;color:var(--muted);font-size:.85rem;border-top:1px solid var(--rule);padding-top:1rem}
-.empty{color:var(--muted)}
-nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font-size:.9rem;margin:0 0 1.5rem}
-.earlier li{padding:.35rem 0}`;
+/**
+ * Dusk on the bayou: the frame (masthead and footer) is always dusk, from
+ * the banner art; the reading column follows the reader's colour scheme,
+ * dusk or morning mist. Colours are sampled from the artwork.
+ */
+export function renderStylesheet(cfg: SiteConfig): string {
+  const font = sitePath(cfg.theme?.displayFont);
+  return `${
+    font
+      ? `@font-face{font-family:"Display";src:url("${font}") format("woff2");font-weight:500 800;font-display:swap}`
+      : ""
+  }
+:root{color-scheme:light dark;
+--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;
+--ground:#eaf0ea;--ink:#0d2a25;--ink-2:#3d554f;--rule:#c4d2c8;
+--firefly:#94470a;--bloom:#6a3a9c;
+--water-a:#7b48b5;--water-b:#d9792b;--water-c:#e2b93b;
+--display:"Display",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+--text:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{
+--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;
+--firefly:#f0a63a;--bloom:#c193ef;
+--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a}}
+*{box-sizing:border-box}
+html{background:var(--dusk);scrollbar-color:var(--firefly) var(--ground)}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--text);-webkit-text-size-adjust:100%}
+::selection{background:var(--bloom);color:var(--ground)}
+a{color:var(--firefly);text-decoration-thickness:1px;text-underline-offset:.2em}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px}
+ul{list-style:none;padding:0;margin:0}
+.wrap{max-width:50rem;margin:0 auto;padding:0 1.25rem}
+
+.mast{background:var(--dusk);color:var(--dusk-ink)}
+.mast a,footer a{color:#f0a63a}
+.art{position:relative;margin:0;overflow:hidden;background:var(--dusk)}
+.art img{display:block;width:100%;height:auto;aspect-ratio:5/2;max-height:34rem;min-height:12.5rem;object-fit:cover;object-position:60% 70%}
+.art::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,var(--dusk) 0,rgb(11 42 38/.8) 13%,rgb(11 42 38/0) 42%)}
+.title{position:absolute;z-index:1;left:0;right:0;bottom:0;padding-bottom:.9rem}
+.mast.plain .title{position:static;padding:2.5rem 0 .5rem}
+.site{font:700 clamp(1.75rem,5vw,3.25rem)/1 var(--display);letter-spacing:-.025em;margin:0;color:var(--lantern);text-wrap:balance}
+.site a{color:inherit;text-decoration:none}
+.tagline{margin:.4rem 0 0;color:var(--dusk-ink-2);font-size:.95rem}
+.bar{display:flex;flex-wrap:wrap;gap:.35rem 1.4rem;padding:.75rem 0 1rem;font-size:.92rem;border-bottom:1px solid #22453e}
+.bar a{text-decoration:none}.bar a:hover{text-decoration:underline}
+main.wrap{padding-top:2.5rem;padding-bottom:3.5rem}
+h1{font:700 clamp(1.6rem,4.2vw,2.35rem)/1.15 var(--display);letter-spacing:-.02em;margin:0;text-wrap:balance}
+h2{font:650 1.3rem/1.25 var(--display);letter-spacing:-.01em;margin:3rem 0 .4rem;padding-bottom:.55rem;scroll-margin-top:1rem;
+background:linear-gradient(90deg,var(--water-a),var(--water-b) 55%,var(--water-c)) no-repeat 0 100%/100% 2px}
+h2 small{font:600 .9rem var(--text);color:var(--bloom);margin-left:.45rem;font-variant-numeric:tabular-nums}
+.counts{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;margin:1.1rem 0 0;padding:0}
+.counts a{color:var(--ink-2);font-size:.9rem;text-decoration:none}
+.counts b{display:block;font:700 1.75rem/1.1 var(--display);color:var(--firefly);font-variant-numeric:tabular-nums}
+.counts a:hover span{text-decoration:underline}
+.toc{margin:1.25rem 0 0;padding:.7rem 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);font-size:.92rem;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:.3rem 1.25rem}
+.toc a{text-decoration:none}.toc a:hover{text-decoration:underline}
+.meta{font-size:.85rem;color:var(--bloom);font-variant-numeric:tabular-nums}
+.arrow{width:.85em;height:.85em;vertical-align:-.08em;margin-right:.3em}
+footer code,main code{font:.92em var(--mono)}
+li{padding:.8rem 0;border-bottom:1px solid var(--rule)}li:last-child{border-bottom:0}
+.name{font:600 .95rem/1.4 var(--mono);overflow-wrap:anywhere}
+.ver{font:.8rem var(--mono);color:var(--ink-2)}
+.ver a{color:var(--ink-2)}
+.sum{margin:.3rem 0 0;max-width:68ch}
+.members{color:var(--ink-2);font-size:.86rem;margin:.35rem 0 0;overflow-wrap:anywhere}
+.community li{padding:1rem 0 1.15rem}.community li .name{font:650 1.02rem/1.35 var(--display);letter-spacing:-.005em}
+.community .ver{font-family:var(--text);font-size:.85rem}
+.empty{color:var(--ink-2)}
+.earlier li{padding:.45rem 0}
+
+footer{background:var(--dusk);color:var(--dusk-ink-2);font-size:.86rem;padding:0 0 2.5rem}
+.shore{position:relative;margin:0 0 1.5rem;overflow:hidden}
+.shore img{display:block;width:100%;height:clamp(4.5rem,9vw,7.5rem);object-fit:cover;object-position:62% 66%}
+.shore-gap{height:1.75rem}
+.shore::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,var(--ground) 0,rgb(11 42 38/0) 55%,var(--dusk) 100%)}
+footer .bar{border:0;padding:0 0 1rem}
+footer p{margin:0;max-width:68ch}
+@media (max-width:30rem){.art img{aspect-ratio:auto;height:12.5rem}.art::after{background:linear-gradient(to top,var(--dusk) 0,rgb(11 42 38/.9) 38%,rgb(11 42 38/.35) 70%,rgb(11 42 38/0) 100%)}.wrap{padding:0 1rem}h2{margin-top:2.5rem}.counts{gap:.4rem 1.2rem}.counts b{font-size:1.45rem}}`;
+}
 
 /**
  * JSON for a `<script type="application/ld+json">` block. `<` is escaped so
@@ -205,7 +292,9 @@ function renderCommunity(c: Community): string {
           }</li>`;
         }).join("\n")
       }</ul>`;
-    parts.push(`<section><h2>Podcast</h2>${body}</section>`);
+    parts.push(
+      `<section class="community" id="podcast"><h2>Podcast</h2>${body}</section>`,
+    );
   }
   if (c.feed.configured) {
     const body = !c.feed.ok
@@ -225,10 +314,59 @@ function renderCommunity(c: Community): string {
           }</li>`
         ).join("\n")
       }</ul>`;
-    parts.push(`<section><h2>From the Swamp Club feed</h2>${body}</section>`);
+    parts.push(
+      `<section class="community" id="feed"><h2>From the Swamp Club feed</h2>${body}</section>`,
+    );
   }
   return parts.join("\n");
 }
+
+/**
+ * The masthead: the banner art with the site name set over its dusk scrim,
+ * then the navigation bar. Without art it is a plain dusk band.
+ */
+function masthead(cfg: SiteConfig, root: string, nav: string): string {
+  const t = cfg.theme ?? {};
+  const big = sitePath(t.banner);
+  const small = sitePath(t.bannerSmall);
+  const name =
+    `<div class="title"><div class="wrap"><p class="site"><a href="${root}index.html">${
+      escapeHtml(cfg.title)
+    }</a></p><p class="tagline">Each week in swamp: new and updated extensions, the podcast, and Swamp Club posts.</p></div></div>`;
+  if (!big) {
+    return `<header class="mast plain">${name}<div class="wrap"><nav class="bar" aria-label="Site">${nav}</nav></div></header>`;
+  }
+  const size = t.bannerWidth && t.bannerHeight
+    ? ` width="${t.bannerWidth}" height="${t.bannerHeight}"`
+    : "";
+  const srcset = small
+    ? ` srcset="${root}${small} 800w, ${root}${big} 1600w" sizes="100vw"`
+    : "";
+  return `<header class="mast"><figure class="art"><img src="${root}${big}"${srcset}${size} alt="${
+    escapeHtml(t.bannerAlt ?? "")
+  }" decoding="async" fetchpriority="high">${name}</figure><div class="wrap"><nav class="bar" aria-label="Site">${nav}</nav></div></header>`;
+}
+
+/** A low strip of the banner's waterline, closing the page. Same file, no new bytes. */
+function shore(cfg: SiteConfig, root: string): string {
+  const big = sitePath(cfg.theme?.banner);
+  const small = sitePath(cfg.theme?.bannerSmall);
+  const art = small ?? big;
+  const srcset = small && big
+    ? ` srcset="${root}${small} 800w, ${root}${big} 1600w" sizes="100vw"`
+    : "";
+  return art
+    ? `<div class="shore" aria-hidden="true"><img src="${root}${art}"${srcset} alt="" decoding="async" loading="lazy"></div>`
+    : `<div class="shore-gap"></div>`;
+}
+
+/** Escape, then set `backticked` spans as code. */
+function withCode(s: string): string {
+  return escapeHtml(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+const ARROW =
+  `<svg class="arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 function page(
   cfg: SiteConfig,
@@ -236,6 +374,8 @@ function page(
   description: string,
   body: string,
   head = "",
+  root = "./",
+  nav = "",
 ): string {
   return `<!doctype html>
 <html lang="en">
@@ -244,17 +384,24 @@ function page(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'">
 <meta name="referrer" content="no-referrer">
 <link rel="alternate" type="application/rss+xml" title="${
     escapeHtml(cfg.title)
   }" href="${escapeHtml(cfg.siteUrl)}/feed.xml">
-${head}<style>${STYLE}</style>
+${head}<link rel="stylesheet" href="${root}site.css">
 </head>
-<body><main>
+<body>
+${masthead(cfg, root, nav)}
+<main class="wrap">
 ${body}
-<footer><p>${escapeHtml(cfg.disclaimer)}</p></footer>
-</main></body>
+</main>
+<footer>${
+    shore(cfg, root)
+  }<div class="wrap"><nav class="bar" aria-label="Site, again">${nav}</nav><p>${
+    withCode(cfg.disclaimer)
+  }</p></div></footer>
+</body>
 </html>
 `;
 }
@@ -315,10 +462,15 @@ function renderItem(
   }${members}</li>`;
 }
 
+/** "Pre-releases (beta and RC)" → "pre-releases (beta and RC)". */
+const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
 function countChips(c: Record<Section, number>): string {
   return `<p class="counts">${
     SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
-      `<span>${c[s]} ${escapeHtml(SECTION_TITLES[s].toLowerCase())}</span>`
+      `<a href="#${s}"><b>${c[s]}</b> <span>${
+        escapeHtml(lowerFirst(SECTION_TITLES[s]))
+      }</span></a>`
     )
       .join("")
   }</p>`;
@@ -330,7 +482,7 @@ function renderMinor(cfg: SiteConfig, its: Item[], o: RenderOptions): string {
   const why =
     `Version bumps and changes under ${o.minChangedLines} lines of code, with no API change.`;
   if (o.minorMode === "count") {
-    return `<section><h2>${
+    return `<section id="minor"><h2>${
       escapeHtml(SECTION_TITLES.minor)
     }</h2><p class="empty">${n} ${
       n === 1 ? "extension" : "extensions"
@@ -343,9 +495,9 @@ function renderMinor(cfg: SiteConfig, its: Item[], o: RenderOptions): string {
         escapeHtml(i.key)
       }</a>`
   ).join(", ");
-  return `<section><h2>${
+  return `<section id="minor"><h2>${
     escapeHtml(SECTION_TITLES.minor)
-  } (${n})</h2><p class="members">${
+  } <small>${n}</small></h2><p class="members">${
     escapeHtml(why)
   }</p><p class="sum">${names}</p></section>`;
 }
@@ -366,23 +518,41 @@ export function renderIssue(
     const its = items.filter((i) => i.section === s);
     if (its.length === 0) return "";
     if (s === "minor") return renderMinor(cfg, its, o);
-    return `<section><h2>${escapeHtml(SECTION_TITLES[s])}</h2><ul>${
+    return `<section id="${s}"><h2>${escapeHtml(SECTION_TITLES[s])} <small>${
+      its.reduce((x, i) => x + i.entries.length, 0)
+    }</small></h2><ul>${
       its.map((i) => renderItem(cfg, i, summaries)).join("\n")
     }</ul></section>`;
   }).join("\n");
   const before = earlier(archive, meta.slug);
   const prev = before[0];
-  const nav = `<nav aria-label="Issues"><a href="../index.html">${
-    escapeHtml(cfg.title)
-  }</a>${
+  const nav = `${
     prev
-      ? `<a rel="prev" href="./${escapeHtml(prev.slug)}.html">← Week of ${
+      ? `<a rel="prev" href="./${escapeHtml(prev.slug)}.html">${ARROW}Week of ${
         escapeHtml(dateRange(prev.slug, prev.lastDay))
       }</a>`
       : ""
-  }<a href="../index.html#issues">All issues</a><a href="./${
+  }<a href="../index.html#issues">All issues</a><a href="../feed.xml">RSS</a><a href="./${
     escapeHtml(meta.slug)
-  }.json">JSON</a></nav>`;
+  }.json">JSON</a>`;
+  // Community sections get plain links; registry sections are reached from
+  // their counts above.
+  const toc: string[] = [];
+  if (community.podcast.configured) {
+    toc.push(`<a href="#podcast">Podcast</a>`);
+  }
+  if (community.feed.configured) {
+    toc.push(
+      `<a href="#feed">From the Swamp Club feed${
+        community.feed.items.length ? ` (${community.feed.items.length})` : ""
+      }</a>`,
+    );
+  }
+  const contents = toc.length
+    ? `<nav class="toc" aria-label="This week in Swamp Club">${
+      toc.join("")
+    }</nav>`
+    : "";
   const recent = before.slice(0, 8);
   const earlierList = recent.length
     ? `<section class="earlier"><h2>Earlier issues</h2><ul>${
@@ -393,9 +563,9 @@ export function renderIssue(
       ).join("\n")
     }</ul></section>`
     : "";
-  const body = `${nav}<header>
-<h1>Week of ${escapeHtml(range)}</h1>
-${items.length ? countChips(c) : ""}</header>
+  const body = `<h1>Week of ${escapeHtml(range)}</h1>
+${items.length ? countChips(c) : ""}
+${contents}
 ${renderCommunity(community)}
 ${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}
 ${earlierList}`;
@@ -425,9 +595,11 @@ ${
   return page(
     cfg,
     `${cfg.title}: ${range}`,
-    `swamp registry changes, ${range}`,
+    `Swamp extensions, podcast and Swamp Club posts, ${range}`,
     body,
     head,
+    "../",
+    nav,
   );
 }
 
@@ -439,22 +611,24 @@ export function renderIndex(cfg: SiteConfig, archive: ArchiveEntry[]): string {
         .reduce((x, [, y]) => x + y, 0);
       return `<li><a href="./issues/${escapeHtml(a.slug)}.html">Week of ${
         escapeHtml(dateRange(a.slug, a.lastDay))
-      }</a> <span class="ver">${total} changes</span></li>`;
+      }</a> <span class="meta">${total} changes</span></li>`;
     },
   ).join("\n");
-  const body = `<header><h1>${escapeHtml(cfg.title)}</h1>
-<p>A weekly digest of new and updated extensions in the swamp registry. <a href="./feed.xml">RSS</a> · <a href="./index.json">JSON</a> · <a href="./llms.txt">llms.txt</a></p></header>
-<section id="issues"><h2>Issues</h2><ul>${
+  const body = `<h1>All issues</h1>
+<p class="sum">A weekly digest of the swamp extension registry: new extensions, updates, pre-releases, yanks and removals, each with a short machine-written summary of the change, plus the week's Swamp Club podcast episode and feed posts.</p>
+<section id="issues"><h2>Every week</h2><ul>${
     rows || `<li class="empty">No issues yet.</li>`
   }</ul></section>`;
   return page(
     cfg,
     cfg.title,
-    "A weekly digest of the swamp extension registry",
+    "A weekly digest of swamp: new and updated extensions, the podcast, and Swamp Club posts",
     body,
     `<link rel="alternate" type="application/json" href="${
       escapeHtml(cfg.siteUrl)
     }/index.json">\n`,
+    "./",
+    `<a href="./feed.xml">RSS</a><a href="./index.json">JSON</a><a href="./llms.txt">llms.txt</a>`,
   );
 }
 

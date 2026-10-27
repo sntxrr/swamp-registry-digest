@@ -90,6 +90,26 @@ both, each issue page carries schema.org `Article` JSON-LD, and `robots.txt`
 and `sitemap.xml` are generated. Each page links to the previous week and
 lists the eight before it.
 
+### Site art
+
+The page works with no art: a plain dusk masthead and system fonts. To give
+it a banner and a display face, put the files in a directory and point the
+model at it:
+
+| argument           | what                                                                  |
+| ------------------ | --------------------------------------------------------------------- |
+| `siteAssetsDir`    | absolute path of a directory published with the site at the same paths (images, WOFF2 fonts, `.txt` licences; no dotfiles, symlinks, other types or files over 2 MB) |
+| `bannerImage`      | site path of the masthead banner, about 1600 px wide                  |
+| `bannerImageSmall` | the same banner about 800 px wide, for phones                         |
+| `bannerWidth`, `bannerHeight` | the banner's pixel size, so the page does not reflow       |
+| `bannerAlt`        | alt text; empty marks the banner decorative                           |
+| `displayFont`      | site path of a WOFF2 face for the masthead and headings               |
+
+Each path must exist in `siteAssetsDir`, or `render` refuses. The page CSP
+allows images and fonts from the site itself only, so art cannot be loaded
+from anywhere else. Binary files are committed through the Git blobs API;
+an unchanged file produces the same blob.
+
 ## Opting out
 
 Authors can leave the digest by adding the label **`no-digest`** to their

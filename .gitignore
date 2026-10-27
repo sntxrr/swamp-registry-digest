@@ -17,3 +17,6 @@
 # instances created here to exercise it carry deployment settings. Only
 # manifest-declared files ship, but the repo is public, so keep them out of git.
 models/**/*.yaml
+
+# Impeccable review captures (local only)
+.impeccable/review/
