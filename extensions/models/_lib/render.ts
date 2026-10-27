@@ -11,6 +11,7 @@
  */
 
 import { type Item, itemId, type Section, SECTION_ORDER } from "./digest.ts";
+import type { FeedPost, PodcastEpisode } from "./community.ts";
 
 export interface IssueMeta {
   slug: string;
@@ -33,6 +34,25 @@ export interface ArchiveEntry {
   lastDay: string;
   counts: Record<Section, number>;
 }
+
+/** One community source as the renderer sees it. */
+export interface CommunitySource<T> {
+  /** Unconfigured sources are left out of the issue entirely. */
+  configured: boolean;
+  ok: boolean;
+  error: string | null;
+  items: T[];
+}
+
+export interface Community {
+  podcast: CommunitySource<PodcastEpisode>;
+  feed: CommunitySource<FeedPost>;
+}
+
+export const NO_COMMUNITY: Community = {
+  podcast: { configured: false, ok: true, error: null, items: [] },
+  feed: { configured: false, ok: true, error: null, items: [] },
+};
 
 export const SECTION_TITLES: Record<Section, string> = {
   new: "New extensions",
@@ -134,13 +154,88 @@ li{padding:.7rem 0;border-bottom:1px solid var(--rule)}li:last-child{border-bott
 .counts{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0 0;padding:0}
 .counts span{background:var(--chip);border-radius:999px;padding:.15rem .65rem;font-size:.85rem}
 footer{margin-top:3rem;color:var(--muted);font-size:.85rem;border-top:1px solid var(--rule);padding-top:1rem}
-.empty{color:var(--muted)}`;
+.empty{color:var(--muted)}
+nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font-size:.9rem;margin:0 0 1.5rem}
+.earlier li{padding:.35rem 0}`;
+
+/**
+ * JSON for a `<script type="application/ld+json">` block. `<` is escaped so
+ * no string can close the script element.
+ */
+export function jsonLd(o: unknown): string {
+  return `<script type="application/ld+json">${
+    JSON.stringify(o).replace(/</g, "\\u003c")
+  }</script>\n`;
+}
+
+const issueUrl = (cfg: SiteConfig, slug: string, ext = "html") =>
+  `${cfg.siteUrl}/issues/${slug}.${ext}`;
+
+/** Archive entries before `slug`, newest first. */
+function earlier(archive: ArchiveEntry[], slug: string): ArchiveEntry[] {
+  return archive.filter((a) => a.slug < slug).sort((a, b) =>
+    b.slug.localeCompare(a.slug)
+  );
+}
+
+function renderCommunity(c: Community): string {
+  const parts: string[] = [];
+  const unavailable = (what: string) =>
+    `<p class="empty">The ${what} could not be read this week.</p>`;
+  if (c.podcast.configured) {
+    const body = !c.podcast.ok
+      ? unavailable("podcast")
+      : c.podcast.items.length === 0
+      ? `<p class="empty">No episode this week.</p>`
+      : `<ul>${
+        c.podcast.items.map((e) => {
+          const video = safeUrl(e.videoUrl);
+          return `<li><a class="name" href="${escapeHtml(e.url)}">${
+            escapeHtml(e.title)
+          }</a>${
+            video
+              ? ` <span class="ver">· <a href="${
+                escapeHtml(video)
+              }" rel="nofollow noopener">video</a></span>`
+              : ""
+          }${
+            e.description
+              ? `<p class="sum">${escapeHtml(e.description)}</p>`
+              : ""
+          }</li>`;
+        }).join("\n")
+      }</ul>`;
+    parts.push(`<section><h2>Podcast</h2>${body}</section>`);
+  }
+  if (c.feed.configured) {
+    const body = !c.feed.ok
+      ? unavailable("Swamp Club feed")
+      : c.feed.items.length === 0
+      ? `<p class="empty">No new posts this week.</p>`
+      : `<ul>${
+        c.feed.items.map((p) =>
+          `<li><a class="name" href="${escapeHtml(p.url)}">${
+            escapeHtml(p.title)
+          }</a>${
+            p.author
+              ? ` <span class="ver">by ${escapeHtml(p.author)}</span>`
+              : ""
+          }${
+            p.summary ? `<p class="sum">${escapeHtml(p.summary)}</p>` : ""
+          }</li>`
+        ).join("\n")
+      }</ul>`;
+    parts.push(`<section><h2>From the Swamp Club feed</h2>${body}</section>`);
+  }
+  return parts.join("\n");
+}
 
 function page(
   cfg: SiteConfig,
   title: string,
   description: string,
   body: string,
+  head = "",
 ): string {
   return `<!doctype html>
 <html lang="en">
@@ -154,7 +249,7 @@ function page(
 <link rel="alternate" type="application/rss+xml" title="${
     escapeHtml(cfg.title)
   }" href="${escapeHtml(cfg.siteUrl)}/feed.xml">
-<style>${STYLE}</style>
+${head}<style>${STYLE}</style>
 </head>
 <body><main>
 ${body}
@@ -261,6 +356,8 @@ export function renderIssue(
   allItems: Item[],
   summaries: Record<string, string>,
   o: RenderOptions = DEFAULT_RENDER,
+  archive: ArchiveEntry[] = [],
+  community: Community = NO_COMMUNITY,
 ): string {
   const items = shown(allItems, o);
   const range = dateRange(meta.slug, meta.lastDay);
@@ -273,17 +370,64 @@ export function renderIssue(
       its.map((i) => renderItem(cfg, i, summaries)).join("\n")
     }</ul></section>`;
   }).join("\n");
-  const body = `<header><p><a href="./../index.html">${
+  const before = earlier(archive, meta.slug);
+  const prev = before[0];
+  const nav = `<nav aria-label="Issues"><a href="../index.html">${
     escapeHtml(cfg.title)
-  }</a></p>
+  }</a>${
+    prev
+      ? `<a rel="prev" href="./${escapeHtml(prev.slug)}.html">← Week of ${
+        escapeHtml(dateRange(prev.slug, prev.lastDay))
+      }</a>`
+      : ""
+  }<a href="../index.html#issues">All issues</a><a href="./${
+    escapeHtml(meta.slug)
+  }.json">JSON</a></nav>`;
+  const recent = before.slice(0, 8);
+  const earlierList = recent.length
+    ? `<section class="earlier"><h2>Earlier issues</h2><ul>${
+      recent.map((a) =>
+        `<li><a href="./${escapeHtml(a.slug)}.html">Week of ${
+          escapeHtml(dateRange(a.slug, a.lastDay))
+        }</a></li>`
+      ).join("\n")
+    }</ul></section>`
+    : "";
+  const body = `${nav}<header>
 <h1>Week of ${escapeHtml(range)}</h1>
 ${items.length ? countChips(c) : ""}</header>
-${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}`;
+${renderCommunity(community)}
+${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}
+${earlierList}`;
+  const head = `<link rel="alternate" type="application/json" href="${
+    escapeHtml(issueUrl(cfg, meta.slug, "json"))
+  }">
+${
+    prev
+      ? `<link rel="prev" href="${escapeHtml(issueUrl(cfg, prev.slug))}">\n`
+      : ""
+  }${
+    jsonLd({
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: `${cfg.title}: week of ${range}`,
+      datePublished: meta.generatedAt,
+      url: issueUrl(cfg, meta.slug),
+      isPartOf: { "@type": "Periodical", name: cfg.title, url: cfg.siteUrl },
+      about: "Changes in the swamp extension registry",
+      encoding: {
+        "@type": "MediaObject",
+        encodingFormat: "application/json",
+        contentUrl: issueUrl(cfg, meta.slug, "json"),
+      },
+    })
+  }`;
   return page(
     cfg,
     `${cfg.title}: ${range}`,
     `swamp registry changes, ${range}`,
     body,
+    head,
   );
 }
 
@@ -299,8 +443,8 @@ export function renderIndex(cfg: SiteConfig, archive: ArchiveEntry[]): string {
     },
   ).join("\n");
   const body = `<header><h1>${escapeHtml(cfg.title)}</h1>
-<p>A weekly digest of new and updated extensions in the swamp registry. <a href="./feed.xml">RSS</a></p></header>
-<section><h2>Issues</h2><ul>${
+<p>A weekly digest of new and updated extensions in the swamp registry. <a href="./feed.xml">RSS</a> · <a href="./index.json">JSON</a> · <a href="./llms.txt">llms.txt</a></p></header>
+<section id="issues"><h2>Issues</h2><ul>${
     rows || `<li class="empty">No issues yet.</li>`
   }</ul></section>`;
   return page(
@@ -308,6 +452,9 @@ export function renderIndex(cfg: SiteConfig, archive: ArchiveEntry[]): string {
     cfg.title,
     "A weekly digest of the swamp extension registry",
     body,
+    `<link rel="alternate" type="application/json" href="${
+      escapeHtml(cfg.siteUrl)
+    }/index.json">\n`,
   );
 }
 
@@ -391,6 +538,7 @@ export function renderDiscord(
   allItems: Item[],
   maxChars = 1900,
   o: RenderOptions = DEFAULT_RENDER,
+  community: Community = NO_COMMUNITY,
 ): DiscordPayload {
   const items = shown(allItems, o);
   const url = `${cfg.siteUrl}/issues/${meta.slug}.html`;
@@ -399,9 +547,20 @@ export function renderDiscord(
   const head = `**${escapeDiscord(cfg.title)}: week of ${
     escapeDiscord(range)
   }**`;
+  // One line per episode. The title is third-party: escaped and capped; the
+  // URL was pinned to the podcast's own site by the reader, and angle
+  // brackets keep Discord from embedding it.
+  const podcast = community.podcast.ok
+    ? community.podcast.items.flatMap((e) => {
+      const u = safeUrl(e.url);
+      return u
+        ? [`\nPodcast: ${escapeDiscord(e.title.slice(0, 120))} <${u}>`]
+        : [];
+    }).join("")
+    : "";
   if (items.length === 0) {
     return {
-      content: `${head}\nNothing new this week.\n<${url}>`,
+      content: `${head}\nNothing new this week.${podcast}\n<${url}>`,
       allowed_mentions: { parse: [] },
       flags: 4,
     };
@@ -412,7 +571,7 @@ export function renderDiscord(
   ) => `${c[s]} ${SECTION_TITLES[s].toLowerCase()}`).join(" · ") +
     (c.minor > 0 ? ` (+${c.minor} minor)` : "");
   const tail = `\nFull issue: <${url}>`;
-  let body = `${head}\n${escapeDiscord(line)}`;
+  let body = `${head}\n${escapeDiscord(line)}${podcast}`;
   const fresh = newLines(items.filter((i) => i.section === "new"));
   if (fresh.length) {
     body += "\n\n**New**";
@@ -429,4 +588,162 @@ export function renderDiscord(
     }
   }
   return { content: body + tail, allowed_mentions: { parse: [] }, flags: 4 };
+}
+
+// --- machine-readable copies ------------------------------------------------
+//
+// The same issue for agents and scripts: one JSON document per issue, a JSON
+// index, an llms.txt (https://llmstxt.org) pointing at both, and a sitemap.
+// They carry exactly what the HTML shows, so they are no more trusted than
+// it is: summaries are machine-written and community text is third-party.
+
+export const JSON_SCHEMA_VERSION = 1;
+
+export function renderIssueJson(
+  cfg: SiteConfig,
+  meta: IssueMeta,
+  allItems: Item[],
+  summaries: Record<string, string>,
+  o: RenderOptions = DEFAULT_RENDER,
+  archive: ArchiveEntry[] = [],
+  community: Community = NO_COMMUNITY,
+): string {
+  const items = shown(allItems, o);
+  const prev = earlier(archive, meta.slug)[0];
+  const source = <T>(s: CommunitySource<T>) =>
+    s.configured ? { available: s.ok, items: s.ok ? s.items : [] } : undefined;
+  const doc = {
+    schemaVersion: JSON_SCHEMA_VERSION,
+    title: `${cfg.title}: week of ${dateRange(meta.slug, meta.lastDay)}`,
+    slug: meta.slug,
+    url: issueUrl(cfg, meta.slug),
+    window: {
+      start: meta.start,
+      end: meta.end,
+      firstDay: meta.slug,
+      lastDay: meta.lastDay,
+    },
+    generatedAt: meta.generatedAt,
+    previous: prev
+      ? { slug: prev.slug, url: issueUrl(cfg, prev.slug, "json") }
+      : null,
+    counts: counts(items),
+    disclaimer: cfg.disclaimer,
+    sections: SECTION_ORDER.flatMap((s) => {
+      const its = items.filter((i) => i.section === s);
+      if (its.length === 0) return [];
+      const minorCountOnly = s === "minor" && o.minorMode === "count";
+      return [{
+        section: s,
+        title: SECTION_TITLES[s],
+        count: its.reduce((x, i) => x + i.entries.length, 0),
+        items: minorCountOnly ? [] : its.map((i) => {
+          const e = i.entries[0];
+          const repo = !i.collapsed && e.repositoryVerified
+            ? safeUrl(e.repository)
+            : null;
+          return {
+            name: i.key,
+            family: i.collapsed,
+            fromVersion: i.collapsed ? null : e.fromVersion,
+            toVersion: i.collapsed ? null : e.toVersion,
+            summary: s === "minor" ? null : summaries[itemId(i)] ?? null,
+            registryUrl: s === "removed" || i.collapsed
+              ? null
+              : registryLink(cfg, e.name),
+            repository: repo,
+            members: i.collapsed
+              ? i.entries.map((m) => ({
+                name: m.name,
+                registryUrl: registryLink(cfg, m.name),
+              }))
+              : undefined,
+          };
+        }),
+      }];
+    }),
+    podcast: source(community.podcast),
+    feed: source(community.feed),
+  };
+  return JSON.stringify(doc, null, 2) + "\n";
+}
+
+export function renderIndexJson(
+  cfg: SiteConfig,
+  archive: ArchiveEntry[],
+): string {
+  return JSON.stringify(
+    {
+      schemaVersion: JSON_SCHEMA_VERSION,
+      title: cfg.title,
+      url: `${cfg.siteUrl}/`,
+      feed: `${cfg.siteUrl}/feed.xml`,
+      issues: [...archive].sort((a, b) => b.slug.localeCompare(a.slug)).map(
+        (a) => ({
+          slug: a.slug,
+          firstDay: a.slug,
+          lastDay: a.lastDay,
+          url: issueUrl(cfg, a.slug),
+          json: issueUrl(cfg, a.slug, "json"),
+          counts: a.counts,
+        }),
+      ),
+    },
+    null,
+    2,
+  ) + "\n";
+}
+
+/** llms.txt: what the site is and where the machine-readable copies live. */
+export function renderLlmsTxt(
+  cfg: SiteConfig,
+  archive: ArchiveEntry[],
+): string {
+  const issues = [...archive].sort((a, b) => b.slug.localeCompare(a.slug));
+  const line = (a: ArchiveEntry) =>
+    `- [Week of ${dateRange(a.slug, a.lastDay)}](${
+      issueUrl(cfg, a.slug, "json")
+    }): JSON; HTML at ${issueUrl(cfg, a.slug)}`;
+  return `# ${cfg.title}
+
+> A weekly digest of the swamp extension registry: new extensions, updates, pre-releases, yanks and removals, with a short machine-written summary of each change, plus the week's Swamp Club podcast episode and feed posts.
+
+Each issue covers Monday to Sunday and is published the following Monday. Every issue has an HTML page and a JSON copy with the same content (\`issues/<first-day>.html\` and \`.json\`). The JSON index lists every issue, newest first.
+
+${cfg.disclaimer}
+
+## Issues
+
+- [Index of all issues](${cfg.siteUrl}/index.json): JSON, newest first
+${issues.slice(0, 12).map(line).join("\n")}
+
+## Optional
+
+- [RSS feed](${cfg.siteUrl}/feed.xml)
+- [swamp extension registry](${
+    cfg.registryUrl.replace(/\/+$/, "")
+  }/extensions): the authoritative source for every extension
+`;
+}
+
+export function renderRobots(cfg: SiteConfig): string {
+  return `User-agent: *\nAllow: /\n\nSitemap: ${cfg.siteUrl}/sitemap.xml\n`;
+}
+
+export function renderSitemap(
+  cfg: SiteConfig,
+  archive: ArchiveEntry[],
+): string {
+  const x = (s: string) => escapeHtml(s);
+  const urls = [
+    `${cfg.siteUrl}/`,
+    ...[...archive].sort((a, b) => b.slug.localeCompare(a.slug)).map((a) =>
+      issueUrl(cfg, a.slug)
+    ),
+  ];
+  return `<?xml version="1.0" encoding="utf-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((u) => `<url><loc>${x(u)}</loc></url>`).join("\n")}
+</urlset>
+`;
 }

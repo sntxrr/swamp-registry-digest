@@ -4,14 +4,15 @@
  * short summary of each change. Rendered as a static site (dated issue pages,
  * an index and an RSS feed) and announced by Discord webhook.
  *
- * The pipeline is seven methods, run in order by a workflow:
+ * The pipeline is eight methods, run in order by a workflow:
  *
  * | method      | reads                        | writes / touches                |
  * | ----------- | ---------------------------- | ------------------------------- |
  * | `collect`   | registry, cursor, catalog    | `issue`, pending catalog        |
  * | `classify`  | `issue`, release archives    | `issue` (minor updates moved)   |
  * | `summarize` | `issue`, release archives    | `summaries`                     |
- * | `render`    | issue, summaries, archive    | `rendered` (+ files on disk)    |
+ * | `community` | `issue`, feed, podcast pages | `community`                     |
+ * | `render`    | issue, summaries, community  | `rendered` (+ files on disk)    |
  * | `publish`   | `rendered`                   | one commit on the Pages branch  |
  * | `announce`  | `rendered`                   | one Discord message             |
  * | `commit`    | all of the above             | cursor, catalog, archive        |
@@ -35,6 +36,9 @@
  *    extension. Opted-out extensions are left out of the issue entirely.
  * 5. **Remote effects default to dry-run.** `publish` and `announce` only
  *    write when called with `dryRun: false`.
+ * 6. **Community sections fail on their own.** The podcast and feed are
+ *    third-party pages; if one cannot be read, the issue says so and still
+ *    goes out. `community` records the error, so a caller can alert on it.
  *
  * @module
  */
@@ -82,10 +86,16 @@ import {
   renderDiscord,
   renderFeed,
   renderIndex,
+  renderIndexJson,
   renderIssue,
+  renderIssueJson,
+  renderLlmsTxt,
+  renderRobots,
+  renderSitemap,
   type SiteConfig,
 } from "./_lib/render.ts";
 import { publishFiles } from "./_lib/publish.ts";
+import { fetchFeed, fetchPodcast } from "./_lib/community.ts";
 
 const DEFAULT_DISCLAIMER =
   "Generated automatically from public swamp registry data. Summaries are machine-written descriptions of each change, " +
@@ -144,6 +154,12 @@ const GlobalArgsSchema = z.object({
   ),
   minorUpdates: z.enum(["list", "count", "drop"]).default("list").describe(
     "How minor updates appear: `list` names them in one compact section, `count` shows only how many, `drop` leaves them out",
+  ),
+  communityFeedUrl: z.string().url().optional().describe(
+    "RSS feed whose posts in the week get their own section, e.g. https://swamp-club.com/feed.xml. Unset: no section",
+  ),
+  podcastSitemapUrl: z.string().url().optional().describe(
+    "Sitemap listing /podcast/YYYY-MM-DD episode pages; episodes dated in the week get a section, e.g. https://swamp-club.com/sitemap.xml. Unset: no section",
   ),
   githubRepo: z.string().optional().describe(
     "owner/name of the Pages repository",
@@ -237,6 +253,35 @@ const SummariesSchema = z.object({
   fallback: z.number(),
 });
 
+const SourceSchema = <T extends z.ZodType>(item: T) =>
+  z.object({
+    configured: z.boolean(),
+    ok: z.boolean(),
+    error: z.string().nullable(),
+    items: z.array(item),
+  });
+
+const CommunitySchema = z.object({
+  slug: z.string(),
+  podcast: SourceSchema(z.object({
+    title: z.string(),
+    episodeNumber: z.number().nullable(),
+    date: z.string(),
+    url: z.string(),
+    description: z.string(),
+    videoUrl: z.string().nullable(),
+  })),
+  feed: SourceSchema(z.object({
+    title: z.string(),
+    url: z.string(),
+    author: z.string(),
+    publishedAt: z.string(),
+    summary: z.string(),
+  })),
+  /** Errors across both sources, for alerting. */
+  errors: z.array(z.string()),
+});
+
 const RenderedSchema = z.object({
   slug: z.string(),
   files: z.record(z.string(), z.string()),
@@ -284,6 +329,7 @@ const ArchiveSchema = z.object({
 
 type Issue = z.infer<typeof IssueSchema>;
 type Summaries = z.infer<typeof SummariesSchema>;
+type CommunityData = z.infer<typeof CommunitySchema>;
 type Rendered = z.infer<typeof RenderedSchema>;
 type Publication = z.infer<typeof PublicationSchema>;
 type Announcement = z.infer<typeof AnnouncementSchema>;
@@ -372,7 +418,7 @@ export const model = {
   type: "@sntxrr/registry-digest",
   description:
     "Weekly digest of new, updated, pre-release, yanked and removed swamp registry extensions, published as a static site and announced on Discord",
-  version: "2026.10.26.1",
+  version: "2026.10.26.2",
   globalArguments: GlobalArgsSchema,
   resources: {
     issue: {
@@ -391,6 +437,13 @@ export const model = {
     summaries: {
       description: "Validated summary per item, plus what was withheld and why",
       schema: SummariesSchema,
+      lifetime: "infinite",
+      garbageCollection: 20,
+    },
+    community: {
+      description:
+        "The week's podcast episodes and feed posts, and any error reading them",
+      schema: CommunitySchema,
       lifetime: "infinite",
       garbageCollection: 20,
     },
@@ -719,9 +772,74 @@ export const model = {
       },
     },
 
+    community: {
+      description:
+        "Read the week's podcast episodes and community feed posts. A source that fails is recorded, not thrown: the issue says it is unavailable.",
+      arguments: z.object({}),
+      execute: async (_args: Seams, ctx: Ctx) => {
+        const g = ctx.globalArgs;
+        const issue = await mustRead<Issue>(ctx, "issue", "collect");
+        const w = {
+          start: issue.start,
+          end: issue.end,
+          firstDay: issue.slug,
+          lastDay: issue.lastDay,
+        };
+        const errors: string[] = [];
+        async function source<T>(
+          what: string,
+          url: string | undefined,
+          get: (url: string) => Promise<T[]>,
+        ) {
+          if (!url) {
+            return { configured: false, ok: true, error: null, items: [] };
+          }
+          try {
+            return {
+              configured: true,
+              ok: true,
+              error: null,
+              items: await get(url),
+            };
+          } catch (err) {
+            const error = `${what}: ${String(err).slice(0, 300)}`;
+            errors.push(error);
+            ctx.logger.warn("Community source failed: {error}", { error });
+            return { configured: true, ok: false, error, items: [] as T[] };
+          }
+        }
+        const podcast = await source(
+          "podcast",
+          g.podcastSitemapUrl,
+          (u) => fetchPodcast(u, w, _args._fetch),
+        );
+        const feed = await source(
+          "feed",
+          g.communityFeedUrl,
+          (u) => fetchFeed(u, w, _args._fetch),
+        );
+        ctx.logger.info(
+          "Community for {slug}: {p} podcast episodes, {f} feed posts, {e} errors",
+          {
+            slug: issue.slug,
+            p: podcast.items.length,
+            f: feed.items.length,
+            e: errors.length,
+          },
+        );
+        const handle = await ctx.writeResource("community", "community", {
+          slug: issue.slug,
+          podcast,
+          feed,
+          errors,
+        });
+        return { dataHandles: [handle] };
+      },
+    },
+
     render: {
       description:
-        "Render the issue page, index, feed and Discord payload; optionally write the site to a directory",
+        "Render the issue page and its JSON copy, the index, feed, llms.txt, sitemap and Discord payload; optionally write the site to a directory",
       arguments: z.object({
         outDir: z.string().optional().describe(
           "Absolute directory to also write the site files into (for previewing)",
@@ -743,6 +861,20 @@ export const model = {
           );
         }
         const archive = (await read<Archive>(ctx, "archive"))?.issues ?? [];
+        const wantsCommunity = Boolean(
+          g.communityFeedUrl || g.podcastSitemapUrl,
+        );
+        const comm = wantsCommunity
+          ? await mustRead<CommunityData>(ctx, "community", "community")
+          : null;
+        if (comm && comm.slug !== issue.slug) {
+          throw new Error(
+            `community is for ${comm.slug} but the issue is ${issue.slug}: run community again`,
+          );
+        }
+        const community = comm
+          ? { podcast: comm.podcast, feed: comm.feed }
+          : undefined;
         const cfg = siteConfig(g);
         const items = issue.items as Item[];
         const opts = {
@@ -768,9 +900,24 @@ export const model = {
             items,
             sums.summaries,
             opts,
+            withThis,
+            community,
+          ),
+          [`issues/${issue.slug}.json`]: renderIssueJson(
+            cfg,
+            meta,
+            items,
+            sums.summaries,
+            opts,
+            withThis,
+            community,
           ),
           "index.html": renderIndex(cfg, withThis),
+          "index.json": renderIndexJson(cfg, withThis),
           "feed.xml": renderFeed(cfg, withThis),
+          "llms.txt": renderLlmsTxt(cfg, withThis),
+          "robots.txt": renderRobots(cfg),
+          "sitemap.xml": renderSitemap(cfg, withThis),
           ".nojekyll": "",
         };
         const discord: DiscordPayload = renderDiscord(
@@ -779,6 +926,7 @@ export const model = {
           items,
           1900,
           opts,
+          community,
         );
 
         if (args.outDir) {

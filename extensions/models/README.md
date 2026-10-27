@@ -2,9 +2,10 @@
 
 A weekly digest of the swamp extension registry: new extensions, updates,
 pre-releases (beta and RC), yanked versions and removals, each with a short
-summary of what changed. It renders a static site (one dated page per issue,
-an index and an RSS feed), commits it to a GitHub Pages branch, and announces
-each issue with a Discord webhook.
+summary of what changed, plus (optionally) the week's podcast episode and
+community feed posts. It renders a static site (one dated page per issue with
+a JSON copy, an index, an RSS feed, `llms.txt` and a sitemap), commits it to
+a GitHub Pages branch, and announces each issue with a Discord webhook.
 
 ## Methods
 
@@ -15,7 +16,8 @@ Run in this order, normally from one workflow:
 | `collect`   | Snapshots the registry and builds the next issue from every version published or yanked in the window | reads the registry                      |
 | `classify`  | Measures each update's real code change and moves those below the threshold to "Minor updates" | downloads both versions of each update |
 | `summarize` | Summarizes each item and validates every summary                                                  | runs your summarizer command            |
-| `render`    | Renders the issue page, index, feed and Discord payload; `outDir` also writes them to disk for preview | none                                   |
+| `community` | Reads the week's podcast episodes and feed posts; a source that fails is recorded, not thrown    | reads `podcastSitemapUrl`, `communityFeedUrl` |
+| `render`    | Renders the issue page and JSON, index, feed, `llms.txt`, sitemap and Discord payload; `outDir` also writes them to disk for preview | none                                   |
 | `publish`   | Commits the site to `githubRepo`@`githubBranch` (default `gh-pages`) as one commit               | **only with `dryRun: false`**           |
 | `announce`  | Posts the announcement to `discordWebhookUrl`                                                    | **only with `dryRun: false`**           |
 | `commit`    | Advances the high-water mark, keeps the catalog snapshot, archives the issue, pings `heartbeatUrl` | refuses unless publish and announce really ran |
@@ -59,6 +61,35 @@ A family of at least `familyThreshold` (default 3) names under one
 "`@swamp/aws`: 293 packages". In the Discord post, a collective with three or
 more new extensions is grouped the same way.
 
+### Community sections
+
+Two optional sources, each off until its argument is set:
+
+- **`communityFeedUrl`**: an RSS feed (e.g. `https://swamp-club.com/feed.xml`).
+  Posts whose `pubDate` falls in the window get a section, linked to their
+  permalink (the item's `guid`) on the feed's own site.
+- **`podcastSitemapUrl`**: a sitemap listing `/podcast/YYYY-MM-DD` episode
+  pages (e.g. `https://swamp-club.com/sitemap.xml`). Episodes dated inside the
+  window are read from their schema.org `PodcastEpisode` JSON-LD and linked,
+  with their YouTube video when the page has one.
+
+Both sections appear above the registry sections, and the Discord
+announcement gets one `Podcast:` line per episode.
+
+If a source cannot be read, the issue says "could not be read this week" and
+still goes out; the error is kept in the `community` data (`errors`) so the
+caller can alert on it. Videos and episodes are links, never embeds: the page
+CSP allows no frames.
+
+### For agents
+
+Every issue is also published as `issues/<first-day>.json` with the same
+content (`schemaVersion: 1`), linked from the page with `rel="alternate"`.
+`index.json` lists every issue, `llms.txt` describes the site and points at
+both, each issue page carries schema.org `Article` JSON-LD, and `robots.txt`
+and `sitemap.xml` are generated. Each page links to the previous week and
+lists the eight before it.
+
 ## Opting out
 
 Authors can leave the digest by adding the label **`no-digest`** to their
@@ -79,6 +110,11 @@ The digest assumes any of it may be hostile.
   the registry page and, when the registry verified it, the repository.
 - **Discord posts cannot ping anyone:** `allowed_mentions: {"parse": []}`,
   and link previews are suppressed.
+- **Community text is third-party too.** Feed and podcast titles and
+  descriptions never reach the summarizer. They are decoded, stripped of
+  control characters, length-capped and escaped. Post links must be https on
+  the feed's own site, episode pages must be on the sitemap's site, and a
+  video must parse as a YouTube video id; the URL is rebuilt from that id.
 - **Archives are read in memory only**, with caps on compressed size,
   decompressed size and per-file size. Nothing from an archive is written to
   disk.
@@ -156,7 +192,8 @@ Secrets come from a vault (`${{ vault.get(...) }}`) and are marked sensitive:
 
 Other useful arguments: `siteUrl` (required), `siteTitle`, `disclaimer`,
 `maxSummaries` (cap on summarizer calls per issue; the rest get metadata
-summaries), `summarizerConcurrency`, `diffBudgetChars`, `familyDiffSample`.
+summaries), `summarizerConcurrency`, `diffBudgetChars`, `familyDiffSample`,
+`communityFeedUrl`, `podcastSitemapUrl`.
 
 ## Example workflow
 
@@ -193,9 +230,18 @@ jobs:
           type: behavior
           behavior: digest
           methodName: summarize
-      - name: render
+      - name: community
         dependsOn:
           - step: summarize
+            condition:
+              type: succeeded
+        task:
+          type: behavior
+          behavior: digest
+          methodName: community
+      - name: render
+        dependsOn:
+          - step: community
             condition:
               type: succeeded
         task:

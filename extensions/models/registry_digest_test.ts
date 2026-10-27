@@ -326,3 +326,122 @@ Deno.test("commit refuses when the publication is for a different issue", async 
     "not published",
   );
 });
+
+const ISSUE_ONLY = {
+  slug: "2026-10-19",
+  start: "2026-10-19T07:00:00Z",
+  end: "2026-10-26T07:00:00Z",
+  lastDay: "2026-10-25",
+  generatedAt: "2026-10-26T16:00:00Z",
+  items: [],
+  counts: {},
+  stats: {
+    catalogSize: 0,
+    candidates: 0,
+    removed: 0,
+    optedOut: 0,
+    firstRun: true,
+  },
+};
+
+const COMMUNITY_ARGS = {
+  ...GLOBAL,
+  communityFeedUrl: "https://club.test/feed.xml",
+  podcastSitemapUrl: "https://club.test/sitemap.xml",
+};
+
+Deno.test("community records a failed source instead of failing the run", async () => {
+  const f: typeof fetch = (input) => {
+    const u = String(input);
+    return Promise.resolve(
+      u.endsWith("feed.xml")
+        ? new Response(
+          `<rss><channel><item><title>Post</title><guid>https://club.test/feed/p/1</guid><pubDate>Tue, 20 Oct 2026 12:00:00 GMT</pubDate></item></channel></rss>`,
+        )
+        : new Response("down", { status: 503 }),
+    );
+  };
+  const { context, getWrittenResources } = ctx(
+    { issue: ISSUE_ONLY },
+    COMMUNITY_ARGS,
+  );
+  await model.methods.community.execute({ _fetch: f }, context);
+  const c = getWrittenResources().find((r) => r.name === "community")!
+    .data as Record<string, any>;
+  assertEquals(c.slug, "2026-10-19");
+  assertEquals(c.feed.ok, true);
+  assertEquals(c.feed.items.map((p: any) => p.title), ["Post"]);
+  assertEquals(c.podcast.ok, false);
+  assertEquals(c.errors.length, 1);
+  assertStringIncludes(
+    c.errors[0],
+    "podcast: Error: GET https://club.test/sitemap.xml: HTTP 503",
+  );
+});
+
+Deno.test("community with no sources configured touches nothing", async () => {
+  const f: typeof fetch = () => {
+    throw new Error("network touched");
+  };
+  const { context, getWrittenResources } = ctx({ issue: ISSUE_ONLY });
+  await model.methods.community.execute({ _fetch: f }, context);
+  const c = getWrittenResources().find((r) => r.name === "community")!
+    .data as Record<string, any>;
+  assertEquals([c.feed.configured, c.podcast.configured, c.errors], [
+    false,
+    false,
+    [],
+  ]);
+});
+
+Deno.test("render requires this week's community data once a source is configured", async () => {
+  const sums = {
+    slug: "2026-10-19",
+    mode: "none",
+    summaries: {},
+    withheld: [],
+    errors: [],
+    generated: 0,
+    fallback: 0,
+  };
+  const missing = ctx({ issue: ISSUE_ONLY, summaries: sums }, COMMUNITY_ARGS);
+  await assertRejects(
+    () => model.methods.render.execute({}, missing.context),
+    Error,
+    "run `community` first",
+  );
+  const empty = { configured: true, ok: true, error: null, items: [] };
+  const stale = ctx({
+    issue: ISSUE_ONLY,
+    summaries: sums,
+    community: { slug: "2026-10-12", podcast: empty, feed: empty, errors: [] },
+  }, COMMUNITY_ARGS);
+  await assertRejects(
+    () => model.methods.render.execute({}, stale.context),
+    Error,
+    "run community again",
+  );
+  const good = ctx({
+    issue: ISSUE_ONLY,
+    summaries: sums,
+    community: { slug: "2026-10-19", podcast: empty, feed: empty, errors: [] },
+  }, COMMUNITY_ARGS);
+  await model.methods.render.execute({}, good.context);
+  const r = good.getWrittenResources().find((x) => x.name === "rendered")!
+    .data as Record<string, any>;
+  assertEquals(Object.keys(r.files).sort(), [
+    ".nojekyll",
+    "feed.xml",
+    "index.html",
+    "index.json",
+    "issues/2026-10-19.html",
+    "issues/2026-10-19.json",
+    "llms.txt",
+    "robots.txt",
+    "sitemap.xml",
+  ]);
+  assertStringIncludes(
+    r.files["issues/2026-10-19.html"],
+    "No episode this week.",
+  );
+});
