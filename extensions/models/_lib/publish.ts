@@ -31,6 +31,8 @@ export async function publishFiles(
   files: Record<string, string>,
   message: string,
   fetchFn: Fetch = fetch,
+  /** Binary files, base64, by path: uploaded as blobs first. */
+  binaries: Record<string, string> = {},
 ): Promise<PublishResult> {
   if (!REPO_RE.test(target.repo)) {
     throw new Error(`invalid GitHub repo "${target.repo}"`);
@@ -81,14 +83,28 @@ export async function publishFiles(
     );
   }
 
+  // Tree entries take text inline; binary files go up as blobs first. An
+  // unchanged file makes the same blob, so re-publishing it adds nothing.
+  const binaryEntries = [];
+  for (const [path, b64] of Object.entries(binaries)) {
+    if (path in files) throw new Error(`${path} is both text and binary`);
+    const blob = await must("POST", "/git/blobs", {
+      content: b64,
+      encoding: "base64",
+    });
+    binaryEntries.push({ path, mode: "100644", type: "blob", sha: blob.sha });
+  }
   const tree = await must("POST", "/git/trees", {
     ...(baseTree ? { base_tree: baseTree } : {}),
-    tree: Object.entries(files).map(([path, content]) => ({
-      path,
-      mode: "100644",
-      type: "blob",
-      content,
-    })),
+    tree: [
+      ...Object.entries(files).map(([path, content]) => ({
+        path,
+        mode: "100644",
+        type: "blob",
+        content,
+      })),
+      ...binaryEntries,
+    ],
   });
   const commit = await must("POST", "/git/commits", {
     message,
@@ -110,7 +126,7 @@ export async function publishFiles(
   return {
     commitSha: commit.sha,
     commitUrl: `https://github.com/${target.repo}/commit/${commit.sha}`,
-    files: Object.keys(files).sort(),
+    files: [...Object.keys(files), ...Object.keys(binaries)].sort(),
     createdBranch: parent === null,
   };
 }

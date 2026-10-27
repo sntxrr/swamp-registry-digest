@@ -438,6 +438,7 @@ Deno.test("render requires this week's community data once a source is configure
     "issues/2026-10-19.json",
     "llms.txt",
     "robots.txt",
+    "site.css",
     "sitemap.xml",
   ]);
   assertStringIncludes(

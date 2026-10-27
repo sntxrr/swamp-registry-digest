@@ -1,0 +1,513 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T02:39:17+00:00",
+  "title": "Design System: Last Week in Swamp",
+  "extensions": {
+    "colorMeta": {
+      "dusk": {
+        "role": "neutral",
+        "displayName": "Bayou Dusk",
+        "canonical": "#0b2a26",
+        "oklch": "oklch(26.1% 0.037 184)",
+        "tonalRamp": [
+          "#00100d",
+          "#0c2b27",
+          "#2a4944",
+          "#496863",
+          "#6a8a85",
+          "#8cada7",
+          "#afd1cc",
+          "#d4f7f1"
+        ]
+      },
+      "dusk-ink": {
+        "role": "neutral",
+        "displayName": "Dusk Ink",
+        "canonical": "#e4ead8",
+        "oklch": "oklch(92.8% 0.025 122)",
+        "tonalRamp": [
+          "#090d03",
+          "#23271a",
+          "#404436",
+          "#5f6454",
+          "#808575",
+          "#a2a897",
+          "#c6ccba",
+          "#ebf1df"
+        ]
+      },
+      "dusk-ink-2": {
+        "role": "neutral",
+        "displayName": "Dusk Ink, Secondary",
+        "canonical": "#aebda4",
+        "oklch": "oklch(78.0% 0.038 133)",
+        "tonalRamp": [
+          "#050e01",
+          "#1e2915",
+          "#3a4731",
+          "#596650",
+          "#7a8870",
+          "#9cab92",
+          "#c0cfb6",
+          "#e5f5da"
+        ]
+      },
+      "dusk-rule": {
+        "role": "neutral",
+        "displayName": "Dusk Rule",
+        "canonical": "#22453e",
+        "oklch": "oklch(36.2% 0.043 179)",
+        "tonalRamp": [
+          "#00110c",
+          "#062c25",
+          "#274a42",
+          "#466962",
+          "#678b83",
+          "#89aea6",
+          "#acd3ca",
+          "#d1f9ef"
+        ]
+      },
+      "lantern": {
+        "role": "tertiary",
+        "displayName": "Lantern",
+        "canonical": "#fff1c4",
+        "oklch": "oklch(95.8% 0.060 93)",
+        "tonalRamp": [
+          "#140900",
+          "#2f2400",
+          "#4d4118",
+          "#6d6138",
+          "#8f8258",
+          "#b2a57a",
+          "#d6c99d",
+          "#fceec1"
+        ]
+      },
+      "firefly": {
+        "role": "primary",
+        "displayName": "Firefly Amber",
+        "canonical": "#f0a63a",
+        "oklch": "oklch(77.9% 0.146 72)",
+        "tonalRamp": [
+          "#250000",
+          "#4c0800",
+          "#6e2d00",
+          "#924e00",
+          "#b77000",
+          "#dc941f",
+          "#ffb850",
+          "#ffe292"
+        ]
+      },
+      "bloom": {
+        "role": "secondary",
+        "displayName": "Violet Bloom",
+        "canonical": "#c193ef",
+        "oklch": "oklch(74.1% 0.137 306)",
+        "tonalRamp": [
+          "#190031",
+          "#360057",
+          "#55277a",
+          "#75489d",
+          "#976ac2",
+          "#bb8de8",
+          "#e0b1ff",
+          "#ffdaff"
+        ]
+      },
+      "sun": {
+        "role": "tertiary",
+        "displayName": "Sun Gold",
+        "canonical": "#fde36a",
+        "oklch": "oklch(91.4% 0.143 97)",
+        "tonalRamp": [
+          "#190500",
+          "#391f00",
+          "#583e00",
+          "#785f00",
+          "#9a8100",
+          "#bea41b",
+          "#e3c94e",
+          "#ffef8e"
+        ]
+      },
+      "dusk-ink-muted": {
+        "role": "neutral",
+        "displayName": "Dusk Ink, Muted",
+        "canonical": "#a9b89e",
+        "oklch": "oklch(76.4% 0.040 132)",
+        "tonalRamp": [
+          "#050e00",
+          "#1e2914",
+          "#3a4730",
+          "#59664f",
+          "#7a886f",
+          "#9cab91",
+          "#c0cfb4",
+          "#e5f5d9"
+        ]
+      },
+      "mist": {
+        "role": "neutral",
+        "displayName": "Morning Mist",
+        "canonical": "#eaf0ea",
+        "oklch": "oklch(94.9% 0.010 145)",
+        "tonalRamp": [
+          "#090c09",
+          "#222622",
+          "#3f433f",
+          "#5e635e",
+          "#7f847f",
+          "#a1a7a1",
+          "#c5cbc5",
+          "#eaf0ea"
+        ]
+      },
+      "mist-ink": {
+        "role": "neutral",
+        "displayName": "Mist Ink",
+        "canonical": "#0d2a25",
+        "oklch": "oklch(26.1% 0.036 180)",
+        "tonalRamp": [
+          "#00100c",
+          "#0e2b26",
+          "#2c4843",
+          "#4b6862",
+          "#6b8a83",
+          "#8dada6",
+          "#b1d1ca",
+          "#d6f7ef"
+        ]
+      },
+      "mist-ink-2": {
+        "role": "neutral",
+        "displayName": "Mist Ink, Secondary",
+        "canonical": "#3d554f",
+        "oklch": "oklch(42.8% 0.031 178)",
+        "tonalRamp": [
+          "#000f0b",
+          "#132a25",
+          "#304842",
+          "#4f6761",
+          "#6f8982",
+          "#91aca5",
+          "#b5d0c9",
+          "#daf6ee"
+        ]
+      },
+      "mist-rule": {
+        "role": "neutral",
+        "displayName": "Mist Rule",
+        "canonical": "#c4d2c8",
+        "oklch": "oklch(85.0% 0.020 155)",
+        "tonalRamp": [
+          "#050e08",
+          "#1d2821",
+          "#3a453d",
+          "#59655c",
+          "#79867d",
+          "#9ca99f",
+          "#bfcdc3",
+          "#e4f3e9"
+        ]
+      },
+      "firefly-mist": {
+        "role": "primary",
+        "displayName": "Firefly Ember (mist)",
+        "canonical": "#94470a",
+        "oklch": "oklch(48.7% 0.122 51)",
+        "tonalRamp": [
+          "#2b0000",
+          "#4e0100",
+          "#712700",
+          "#96490d",
+          "#bb6a37",
+          "#e18d5a",
+          "#ffb27e",
+          "#ffd7a4"
+        ]
+      },
+      "bloom-mist": {
+        "role": "secondary",
+        "displayName": "Violet Bloom (mist)",
+        "canonical": "#6a3a9c",
+        "oklch": "oklch(45.7% 0.155 303)",
+        "tonalRamp": [
+          "#170033",
+          "#360060",
+          "#542283",
+          "#7445a8",
+          "#9667cd",
+          "#b98af4",
+          "#deafff",
+          "#ffdbff"
+        ]
+      },
+      "water-a-mist": {
+        "role": "secondary",
+        "displayName": "Waterline Violet (mist)",
+        "canonical": "#7b48b5",
+        "oklch": "oklch(51.4% 0.167 302)",
+        "tonalRamp": [
+          "#170033",
+          "#370065",
+          "#551c89",
+          "#7541ae",
+          "#9764d4",
+          "#ba88fb",
+          "#deacff",
+          "#fedbff"
+        ]
+      },
+      "water-b-mist": {
+        "role": "primary",
+        "displayName": "Waterline Amber (mist)",
+        "canonical": "#d9792b",
+        "oklch": "oklch(67.1% 0.148 55)",
+        "tonalRamp": [
+          "#2a0000",
+          "#540000",
+          "#781f00",
+          "#9d4300",
+          "#c36509",
+          "#ea893e",
+          "#ffad64",
+          "#ffd9a0"
+        ]
+      },
+      "water-c-mist": {
+        "role": "tertiary",
+        "displayName": "Waterline Gold (mist)",
+        "canonical": "#e2b93b",
+        "oklch": "oklch(80.1% 0.145 90)",
+        "tonalRamp": [
+          "#1d0200",
+          "#3f1a00",
+          "#5f3a00",
+          "#815a00",
+          "#a47c00",
+          "#c8a00f",
+          "#eec449",
+          "#ffeb8d"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Site name over the artwork."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page H1, Week of ..."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section h2 on the waterline; community entry names at 1.02rem."
+      },
+      "count": {
+        "displayName": "Count",
+        "purpose": "Issue counts, tabular figures; 1.45rem at <=30rem."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Summaries and running text, max 68ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Nav bar, contents line, captions, footer (0.85-0.92rem)."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Extension names; versions at 0.8rem regular; inline code."
+      }
+    },
+    "modes": {
+      "strategy": "Frame (masthead, footer, html) fixed at dusk; reading column switches on prefers-color-scheme.",
+      "dark": {
+        "ground": "#0b2a26",
+        "ink": "#e4ead8",
+        "ink-2": "#a9b89e",
+        "rule": "#22453e",
+        "link": "#f0a63a",
+        "bloom": "#c193ef",
+        "waterline": [
+          "#c193ef",
+          "#f0a63a",
+          "#fde36a"
+        ]
+      },
+      "light": {
+        "ground": "#eaf0ea",
+        "ink": "#0d2a25",
+        "ink-2": "#3d554f",
+        "rule": "#c4d2c8",
+        "link": "#94470a",
+        "bloom": "#6a3a9c",
+        "waterline": [
+          "#7b48b5",
+          "#d9792b",
+          "#e2b93b"
+        ]
+      }
+    },
+    "gradients": [
+      {
+        "name": "waterline",
+        "value": "linear-gradient(90deg, var(--water-a), var(--water-b) 55%, var(--water-c)) no-repeat 0 100% / 100% 2px",
+        "purpose": "Rule under every section h2."
+      },
+      {
+        "name": "masthead-scrim",
+        "value": "linear-gradient(to top, #0b2a26 0, rgb(11 42 38/.8) 13%, rgb(11 42 38/0) 42%)",
+        "purpose": "Legibility of site name and tagline over the art (desktop)."
+      },
+      {
+        "name": "masthead-scrim-phone",
+        "value": "linear-gradient(to top, #0b2a26 0, rgb(11 42 38/.9) 38%, rgb(11 42 38/.35) 70%, rgb(11 42 38/0) 100%)",
+        "purpose": "Denser scrim at <=30rem."
+      },
+      {
+        "name": "shore-fade",
+        "value": "linear-gradient(to bottom, var(--ground) 0, rgb(11 42 38/0) 55%, #0b2a26 100%)",
+        "purpose": "Footer art strip fading from reading ground into dusk."
+      }
+    ],
+    "shadows": [],
+    "motion": [],
+    "focus": {
+      "value": "2px solid var(--firefly); outline-offset: 3px; border-radius: 2px",
+      "purpose": "All focusable elements."
+    },
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "30rem",
+        "purpose": "max-width: fixed 12.5rem banner, denser scrim, 1rem gutters, 2.5rem section gap, 1.45rem counts."
+      }
+    ],
+    "constraints": {
+      "csp": "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'",
+      "stylesheet": "One shared /site.css linked by every page, so back issues restyle.",
+      "assets": "Asset files are never renamed.",
+      "font": "Bricolage Grotesque woff2 self-hosted, wght 500-800, opsz 72, OFL licence shipped beside it."
+    }
+  },
+  "components": [
+    {
+      "name": "Masthead Nav Bar",
+      "kind": "nav",
+      "refersTo": "masthead-link",
+      "description": "Plain amber links on the dusk frame; underline on hover; previous-week link carries the inline SVG chevron.",
+      "html": "<div class=\"ds-mast\"><nav class=\"ds-bar\"><a href=\"#\"><svg class=\"ds-arrow\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M10 3 5 8l5 5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>Week of Oct 12 – Oct 18, 2026</a><a href=\"#\">All issues</a><a href=\"#\">RSS</a><a href=\"#\">JSON</a></nav></div>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-mast{background:var(--dusk);color:var(--dusk-ink);padding:0 1.25rem;font:16px/1.6 var(--text)} .ds-bar{display:flex;flex-wrap:wrap;gap:.35rem 1.4rem;padding:.75rem 0 1rem;font-size:.92rem;border-bottom:1px solid #22453e} .ds-bar a{color:#f0a63a;text-decoration:none} .ds-bar a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:.2em} .ds-bar a:focus-visible{outline:2px solid #f0a63a;outline-offset:3px;border-radius:2px} .ds-arrow{width:.85em;height:.85em;vertical-align:-.08em;margin-right:.3em}"
+    },
+    {
+      "name": "Masthead Title Over Art",
+      "kind": "custom",
+      "refersTo": "masthead-site-name",
+      "description": "Lantern site name and tagline over the dusk scrim at the base of the artwork banner (art omitted here; scrim shown on dusk).",
+      "html": "<div class=\"ds-art\"><div class=\"ds-title\"><p class=\"ds-site\"><a href=\"#\">Last Week in Swamp</a></p><p class=\"ds-tagline\">Each week in swamp: new and updated extensions, the podcast, and Swamp Club posts.</p></div></div>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-art{position:relative;height:12.5rem;background:linear-gradient(to top,var(--dusk) 0,rgb(11 42 38/.8) 13%,rgb(11 42 38/0) 42%),linear-gradient(160deg,#1d4a3f,#6b4a2a);font-family:var(--text)} .ds-title{position:absolute;left:1.25rem;right:1.25rem;bottom:0;padding-bottom:.9rem} .ds-site{font:700 clamp(1.75rem,5vw,3.25rem)/1 var(--display);letter-spacing:-.025em;margin:0;color:var(--lantern)} .ds-site a{color:inherit;text-decoration:none} .ds-site a:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px} .ds-tagline{margin:.4rem 0 0;color:var(--dusk-ink-2);font-size:.95rem}"
+    },
+    {
+      "name": "Issue Counts",
+      "kind": "custom",
+      "refersTo": "count-figure",
+      "description": "Linked counts: amber display-face tabular figure over a muted caption.",
+      "html": "<p class=\"ds-counts\"><a href=\"#\"><b>83</b> <span>new extensions</span></a><a href=\"#\"><b>596</b> <span>updated</span></a><a href=\"#\"><b>10</b> <span>pre-releases</span></a></p>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-counts{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem;margin:0;padding:1rem;background:var(--ground);font:16px/1.6 var(--text)} .ds-counts a{color:var(--ink-2);font-size:.9rem;text-decoration:none} .ds-counts b{display:block;font:700 1.75rem/1.1 var(--display);color:var(--firefly);font-variant-numeric:tabular-nums} .ds-counts a:hover span{text-decoration:underline} .ds-counts a:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px}"
+    },
+    {
+      "name": "Contents Line",
+      "kind": "nav",
+      "refersTo": "masthead-link",
+      "description": "Section links in a wrapping row between two hairlines.",
+      "html": "<nav class=\"ds-toc\"><a href=\"#\">Podcast</a><a href=\"#\">From the Swamp Club feed (5)</a><a href=\"#\">New</a><a href=\"#\">Updated</a></nav>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-toc{padding:.7rem 0;margin:0 1rem;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);font:.92rem/1.6 var(--text);color:var(--ink-2);display:flex;flex-wrap:wrap;gap:.3rem 1.25rem;background:var(--ground)} .ds-toc a{color:var(--firefly);text-decoration:none} .ds-toc a:hover{text-decoration:underline} .ds-toc a:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px}"
+    },
+    {
+      "name": "Waterline Section Heading",
+      "kind": "custom",
+      "refersTo": "section-heading",
+      "description": "Display h2 on a 2px violet to amber to sun gradient rule, with an optional violet tabular count.",
+      "html": "<h2 class=\"ds-h2\">New extensions <small>83</small></h2>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-h2{font:650 1.3rem/1.25 var(--display);letter-spacing:-.01em;margin:0;padding:1rem 1rem .55rem;color:var(--ink);background:linear-gradient(90deg,var(--water-a),var(--water-b) 55%,var(--water-c)) no-repeat 0 100%/100% 2px,var(--ground)} .ds-h2 small{font:600 .9rem var(--text);color:var(--bloom);margin-left:.45rem;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Extension Entry",
+      "kind": "card",
+      "refersTo": "entry",
+      "description": "List item: amber mono name, muted mono version, body summary at 68ch, hairline divider.",
+      "html": "<ul class=\"ds-list\"><li><a class=\"ds-name\" href=\"#\">@example/registry-tool</a> <span class=\"ds-ver\">1.4.0</span><p class=\"ds-sum\">Adds a sync method and changes the lookup argument shape.</p></li><li><a class=\"ds-name\" href=\"#\">@example/another</a> <span class=\"ds-ver\">0.2.1</span><p class=\"ds-sum\">First release.</p></li></ul>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-list{list-style:none;margin:0;padding:0 1rem;background:var(--ground);color:var(--ink);font:16px/1.6 var(--text)} .ds-list li{padding:.8rem 0;border-bottom:1px solid var(--rule)} .ds-list li:last-child{border-bottom:0} .ds-name{font:600 .95rem/1.4 var(--mono);color:var(--firefly);overflow-wrap:anywhere;text-decoration-thickness:1px;text-underline-offset:.2em} .ds-name:hover{text-decoration-thickness:2px} .ds-name:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px} .ds-ver{font:.8rem var(--mono);color:var(--ink-2)} .ds-sum{margin:.3rem 0 0;max-width:68ch}"
+    },
+    {
+      "name": "Community Entry",
+      "kind": "card",
+      "refersTo": "entry",
+      "description": "Podcast and feed items: display-face title, system-sans byline.",
+      "html": "<ul class=\"ds-list\"><li><a class=\"ds-cname\" href=\"#\">Gatekeeping in the Age of AI</a> <span class=\"ds-cver\">by stack72</span><p class=\"ds-sum\">Every shift in software has been told it's already solved.</p></li></ul>",
+      "css": ":root{--dusk:#0b2a26;--dusk-ink:#e4ead8;--dusk-ink-2:#aebda4;--lantern:#fff1c4;--ground:#0b2a26;--ink:#e4ead8;--ink-2:#a9b89e;--rule:#22453e;--firefly:#f0a63a;--bloom:#c193ef;--water-a:#c193ef;--water-b:#f0a63a;--water-c:#fde36a;--display:\"Display\",ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--text:ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace} .ds-list{list-style:none;margin:0;padding:0 1rem;background:var(--ground);color:var(--ink);font:16px/1.6 var(--text)} .ds-list li{padding:1rem 0 1.15rem} .ds-cname{font:650 1.02rem/1.35 var(--display);letter-spacing:-.005em;color:var(--firefly);text-decoration-thickness:1px;text-underline-offset:.2em} .ds-cname:hover{text-decoration-thickness:2px} .ds-cname:focus-visible{outline:2px solid var(--firefly);outline-offset:3px;border-radius:2px} .ds-cver{font-size:.85rem;color:var(--ink-2)} .ds-sum{margin:.3rem 0 0;max-width:68ch}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Dusk Field Journal",
+    "overview": "A field journal kept at dusk on the bayou. The owner's artwork owns the frame: a full-bleed banner opens every page and a cropped strip of the same art (the \"shore\") closes it, and both stay at dusk whatever the reader's colour mode. Between them the reading column is calm and dense enough to scan ~300 entries: a single 50rem column, system sans text, hairline dividers, and colour spent only on links, counts and the waterline under each section heading.\n\nThe palette is sampled from the artwork, not invented: bayou-teal sky for the ground, firefly amber for everything you can click, violet bloom for secondary emphasis, and sun gold only at the far end of the waterline. The reading column follows `prefers-color-scheme`: dusk at night, \"morning mist\" (a pale green-grey ground with bayou-teal ink) by day. The frame never brightens.\n\nIt is a static page under a strict CSP (`default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'`): no scripts, no inline styles, no third-party anything. Every page links one shared `/site.css`, so a change to the stylesheet restyles every back issue; asset files are never renamed. There is no motion by design.",
+    "keyCharacteristics": [
+      "Dusk frame (masthead and footer) in both colour modes; reading column flips dusk / morning mist.",
+      "Firefly amber is the only link and count colour; violet bloom marks secondary metadata.",
+      "One display face, Bricolage Grotesque, for the site name, headings and figures; system sans for reading; mono only for extension names and versions.",
+      "Section openers sit on a 2px violet → amber → sun gradient rule (the waterline).",
+      "Flat: no shadows, no cards, no rounded containers, no motion."
+    ],
+    "rules": [
+      {
+        "name": "The Dusk Frame Rule",
+        "body": "Masthead and footer are always dusk, in both colour modes. Only the reading column follows `prefers-color-scheme`. Frame colours are fixed values, never the mode-switching variables.",
+        "section": "colors"
+      },
+      {
+        "name": "The Firefly Rule",
+        "body": "Amber means \"you can go here\" (or a count that is itself a link). Don't use it for decoration, headings or body emphasis.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paired Value Rule",
+        "body": "Every reading-column colour ships as a dark/mist pair and both values must pass WCAG AA on their own ground. A new colour without its mist partner is incomplete.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is For Names Rule",
+        "body": "Mono is reserved for extension names, version strings and inline `code`. Podcast and feed titles use the display face instead.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number the reader compares (counts, section totals, dates) uses `font-variant-numeric: tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Art Is The Only Depth Rule",
+        "body": "Gradients exist only as scrims over the artwork and as the waterline. Don't add shadows, glows or tinted panels to the reading column.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep masthead and footer at dusk in both modes, using fixed frame colours, not the mode variables.",
+      "**Do** ship every reading-column colour as a dark/mist pair that passes WCAG AA on its own ground.",
+      "**Do** put all styling in the one shared `/site.css`; it restyles every back issue.",
+      "**Do** use Bricolage Grotesque only for the site name, headings, community titles and counts; system sans for everything read.",
+      "**Do** keep scrims over the artwork dense enough for the tagline to hold ≥5.0:1 against the brightest 1% of the art, including at 390px."
+    ],
+    "donts": [
+      "**Don't** add scripts, inline styles or any off-site asset; the CSP forbids them.",
+      "**Don't** rename asset files; published issues reference them.",
+      "**Don't** add shadows, cards, rounded containers or tinted panels to the reading column.",
+      "**Don't** add motion; the system has none by design.",
+      "**Don't** use amber for anything that is not a link or a linked count.",
+      "**Don't** make it neon-on-black or a plain changelog on white (the owner's anti-references)."
+    ]
+  }
+}

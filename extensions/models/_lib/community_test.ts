@@ -284,10 +284,9 @@ Deno.test("issue page: links to the previous week and lists earlier issues", () 
   ];
   const html = renderIssue(CFG, META, [], {}, undefined, archive);
   assert(
-    html.includes(
-      `<a rel="prev" href="./2026-10-12.html">← Week of Oct 12 – Oct 18, 2026</a>`,
-    ),
+    html.includes(`<a rel="prev" href="./2026-10-12.html"><svg class="arrow"`),
   );
+  assert(html.includes(`</svg>Week of Oct 12 – Oct 18, 2026</a>`));
   assert(html.includes(`<a href="./2026-10-05.html">`));
   assert(html.includes(`href="https://site.test/issues/2026-10-19.json"`));
   // The first issue has no previous link and no earlier list.
@@ -373,7 +372,7 @@ Deno.test("issue page: community sections come before the registry sections", ()
     EPISODE,
   );
   const pod = html.indexOf("<h2>Podcast</h2>");
-  const reg = html.indexOf("<h2>New extensions</h2>");
+  const reg = html.indexOf('<section id="new">');
   assert(pod > 0 && reg > pod);
 });
 

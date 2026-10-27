@@ -92,8 +92,11 @@ import {
   renderLlmsTxt,
   renderRobots,
   renderSitemap,
+  renderStylesheet,
   type SiteConfig,
+  sitePath,
 } from "./_lib/render.ts";
+import { decodeBase64, encodeBase64 } from "jsr:@std/encoding@1.0.10/base64";
 import { publishFiles } from "./_lib/publish.ts";
 import { fetchFeed, fetchPodcast } from "./_lib/community.ts";
 
@@ -160,6 +163,23 @@ const GlobalArgsSchema = z.object({
   ),
   podcastSitemapUrl: z.string().url().optional().describe(
     "Sitemap listing /podcast/YYYY-MM-DD episode pages; episodes dated in the week get a section, e.g. https://swamp-club.com/sitemap.xml. Unset: no section",
+  ),
+  siteAssetsDir: z.string().optional().describe(
+    "Absolute path of a directory of static files (images, fonts, licences) published with the site at the same relative paths",
+  ),
+  bannerImage: z.string().optional().describe(
+    "Site-relative path of the masthead banner (about 1600 px wide), e.g. assets/banner-1600.webp",
+  ),
+  bannerImageSmall: z.string().optional().describe(
+    "Site-relative path of the banner for narrow screens (about 800 px wide)",
+  ),
+  bannerWidth: z.number().int().positive().optional(),
+  bannerHeight: z.number().int().positive().optional(),
+  bannerAlt: z.string().default("").describe(
+    "Alt text for the banner; empty marks it decorative",
+  ),
+  displayFont: z.string().optional().describe(
+    "Site-relative path of a WOFF2 display face for the masthead and headings",
   ),
   githubRepo: z.string().optional().describe(
     "owner/name of the Pages repository",
@@ -291,6 +311,8 @@ const RenderedSchema = z.object({
     flags: z.number(),
   }),
   outDir: z.string().nullable(),
+  /** Binary site files (images, fonts), base64, by site path. */
+  assets: z.record(z.string(), z.string()).default({}),
 });
 
 const PublicationSchema = z.object({
@@ -380,7 +402,60 @@ function siteConfig(g: GlobalArgs): SiteConfig {
     siteUrl: g.siteUrl.replace(/\/+$/, ""),
     registryUrl: g.registryUrl,
     disclaimer: g.disclaimer,
+    theme: {
+      banner: g.bannerImage,
+      bannerSmall: g.bannerImageSmall,
+      bannerWidth: g.bannerWidth,
+      bannerHeight: g.bannerHeight,
+      bannerAlt: g.bannerAlt,
+      displayFont: g.displayFont,
+    },
   };
+}
+
+const ASSET_TYPES = /\.(webp|avif|png|jpe?g|gif|ico|woff2|txt)$/i;
+const MAX_ASSET_BYTES = 2 * 1024 * 1024;
+const PROVENANCE_SIDECAR = /\.(webp|avif|png|jpe?g|gif)\.json$/i;
+const MAX_ASSETS = 50;
+
+/**
+ * Every publishable file under `dir`, base64 by site path. Only image, font
+ * and text types; no dotfiles, no symlinks, nothing over 2 MB.
+ */
+export async function readSiteAssets(
+  dir: string,
+): Promise<Record<string, string>> {
+  if (!dir.startsWith("/")) {
+    throw new Error("siteAssetsDir must be an absolute path");
+  }
+  const root = dir.replace(/\/+$/, "");
+  const out: Record<string, string> = {};
+  const walk = async (rel: string) => {
+    for await (const e of Deno.readDir(rel ? `${root}/${rel}` : root)) {
+      const path = rel ? `${rel}/${e.name}` : e.name;
+      if (e.name.startsWith(".") || e.isSymlink) continue;
+      // Provenance sidecars (`banner.webp.json`) and Markdown notes stay in
+      // the repo, unpublished.
+      if (PROVENANCE_SIDECAR.test(e.name) || /\.md$/i.test(e.name)) continue;
+      if (e.isDirectory) {
+        await walk(path);
+        continue;
+      }
+      if (!ASSET_TYPES.test(e.name) || !sitePath(path)) {
+        throw new Error(`siteAssetsDir: refusing ${path} (type or name)`);
+      }
+      const bytes = await Deno.readFile(`${root}/${path}`);
+      if (bytes.length > MAX_ASSET_BYTES) {
+        throw new Error(`siteAssetsDir: ${path} is over 2 MB`);
+      }
+      out[path] = encodeBase64(bytes);
+      if (Object.keys(out).length > MAX_ASSETS) {
+        throw new Error(`siteAssetsDir: more than ${MAX_ASSETS} files`);
+      }
+    }
+  };
+  await walk("");
+  return out;
 }
 
 /** Run `fn` over `xs` with at most `n` in flight, preserving order. */
@@ -418,7 +493,7 @@ export const model = {
   type: "@sntxrr/registry-digest",
   description:
     "Weekly digest of new, updated, pre-release, yanked and removed swamp registry extensions, published as a static site and announced on Discord",
-  version: "2026.10.26.2",
+  version: "2026.10.26.3",
   globalArguments: GlobalArgsSchema,
   resources: {
     issue: {
@@ -912,6 +987,7 @@ export const model = {
             withThis,
             community,
           ),
+          "site.css": renderStylesheet(cfg),
           "index.html": renderIndex(cfg, withThis),
           "index.json": renderIndexJson(cfg, withThis),
           "feed.xml": renderFeed(cfg, withThis),
@@ -920,6 +996,29 @@ export const model = {
           "sitemap.xml": renderSitemap(cfg, withThis),
           ".nojekyll": "",
         };
+        const assets = g.siteAssetsDir
+          ? await readSiteAssets(g.siteAssetsDir)
+          : {};
+        for (
+          const [arg, path] of [
+            ["bannerImage", g.bannerImage],
+            ["bannerImageSmall", g.bannerImageSmall],
+            ["displayFont", g.displayFont],
+          ] as const
+        ) {
+          if (path === undefined) continue;
+          if (!sitePath(path)) {
+            throw new Error(`${arg} must be a plain site-relative path`);
+          }
+          if (!(path in assets)) {
+            throw new Error(`${arg} ${path} is not in siteAssetsDir`);
+          }
+        }
+        for (const path of Object.keys(assets)) {
+          if (path in files) {
+            throw new Error(`siteAssetsDir: ${path} collides with a page`);
+          }
+        }
         const discord: DiscordPayload = renderDiscord(
           cfg,
           meta,
@@ -940,6 +1039,13 @@ export const model = {
             });
             await Deno.writeTextFile(full, content);
           }
+          for (const [path, b64] of Object.entries(assets)) {
+            const full = `${args.outDir.replace(/\/+$/, "")}/${path}`;
+            await Deno.mkdir(full.slice(0, full.lastIndexOf("/")), {
+              recursive: true,
+            });
+            await Deno.writeFile(full, decodeBase64(b64));
+          }
           await Deno.writeTextFile(
             `${args.outDir.replace(/\/+$/, "")}/discord.json`,
             JSON.stringify(discord, null, 2),
@@ -954,6 +1060,7 @@ export const model = {
           files,
           discord,
           outDir: args.outDir ?? null,
+          assets,
         });
         return { dataHandles: [handle] };
       },
@@ -966,7 +1073,8 @@ export const model = {
       execute: async (args: { dryRun: boolean } & Seams, ctx: Ctx) => {
         const g = ctx.globalArgs;
         const r = await mustRead<Rendered>(ctx, "rendered", "render");
-        const files = Object.keys(r.files).sort();
+        const assets = r.assets ?? {};
+        const files = [...Object.keys(r.files), ...Object.keys(assets)].sort();
         let result: Publication = {
           slug: r.slug,
           dryRun: args.dryRun,
@@ -1000,6 +1108,7 @@ export const model = {
             r.files,
             `Issue ${r.slug}`,
             args._fetch,
+            assets,
           );
           result = {
             ...result,
