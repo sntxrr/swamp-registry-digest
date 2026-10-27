@@ -18,7 +18,7 @@ web
 
 ## Product Purpose
 
-Last Week in Swamp is a weekly digest of the swamp extension registry: new
+Last Week in Swamp Club is a weekly digest of the swamp extension registry: new
 extensions, updates, pre-releases, yanks and removals, each with a short
 machine-written summary of the change, plus that week's Swamp Club podcast
 episode and community feed posts. One dated issue per Monday-to-Sunday week,
@@ -57,7 +57,7 @@ else gives a week-by-week view of the whole registry.
 
 ## Brand Commitments
 
-- Name: **Last Week in Swamp**.
+- Name: **Last Week in Swamp Club**.
 - Visual reference (owner, 2026-10-26): the owner's artwork *Swamp Synthwave
   Gathering at Dusk*: a dusk bayou of cypress and Spanish moss, an orange
   sunset on still water, amber firefly lights, violet glowing flowers, cyan

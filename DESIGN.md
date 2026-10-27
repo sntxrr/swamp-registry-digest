@@ -1,5 +1,5 @@
 ---
-name: Last Week in Swamp
+name: Last Week in Swamp Club
 description: A weekly field journal of the swamp extension registry, kept at dusk on the bayou.
 colors:
   dusk: "#0b2a26"
@@ -106,7 +106,7 @@ components:
     textColor: "{colors.dusk-ink-2}"
 ---
 
-# Design System: Last Week in Swamp
+# Design System: Last Week in Swamp Club
 
 ## Overview
 
