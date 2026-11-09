@@ -668,32 +668,6 @@ export function escapeDiscord(s: string): string {
   return s.replace(/([\\*_~`|\[\]])/g, "\\$1");
 }
 
-/**
- * New extensions as Discord lines, grouping a collective with `threshold` or
- * more new names into one line ("`@reset`: 45 new"), the same way families
- * collapse on the page.
- */
-function newLines(items: Item[], threshold = 3): string[] {
-  const byCollective = new Map<string, number>();
-  for (const i of items) {
-    const c = i.key.split("/")[0];
-    byCollective.set(c, (byCollective.get(c) ?? 0) + i.entries.length);
-  }
-  const out: string[] = [];
-  const done = new Set<string>();
-  for (const i of items) {
-    const c = i.key.split("/")[0];
-    const n = byCollective.get(c)!;
-    if (n >= threshold) {
-      if (!done.has(c)) out.push(`${c}: ${n} new`);
-      done.add(c);
-    } else {
-      out.push(i.collapsed ? `${i.key} (${i.entries.length} packages)` : i.key);
-    }
-  }
-  return out;
-}
-
 export interface DiscordPayload {
   content: string;
   allowed_mentions: { parse: never[] };
@@ -701,10 +675,10 @@ export interface DiscordPayload {
 }
 
 /**
- * The announcement: counts, the new extensions by name, and the link.
- * Summaries stay on the page; Discord gets the headline. `flags: 4`
- * suppresses link embeds, and `allowed_mentions` with an empty `parse` means
- * no text in the message can ping anyone.
+ * The announcement: the headline, the link, and one count per line, the same
+ * shape as the hand-written posts it replaced. Names and summaries stay on the
+ * page. `flags: 4` suppresses link embeds, and `allowed_mentions` with an
+ * empty `parse` means no text in the message can ping anyone.
  */
 export function renderDiscord(
   cfg: SiteConfig,
@@ -739,29 +713,20 @@ export function renderDiscord(
       flags: 4,
     };
   }
-  // The headline counts real changes; minor updates trail in brackets.
-  const line = SECTION_ORDER.filter((s) => s !== "minor" && c[s] > 0).map((
-    s,
-  ) => `${c[s]} ${SECTION_TITLES[s].toLowerCase()}`).join(" · ") +
-    (c.minor > 0 ? ` (+${c.minor} minor)` : "");
-  const tail = `\nFull issue: <${url}>`;
-  let body = `${head}\n${escapeDiscord(line)}${podcast}`;
-  const fresh = newLines(items.filter((i) => i.section === "new"));
-  if (fresh.length) {
-    body += "\n\n**New**";
-    let shown = 0;
-    for (const l of fresh) {
-      const next = `\n• ${escapeDiscord(l)}`;
-      const more = `\n…and ${fresh.length - shown} more`;
-      if (body.length + next.length + more.length + tail.length > maxChars) {
-        body += more;
-        break;
-      }
-      body += next;
-      shown++;
-    }
-  }
-  return { content: body + tail, allowed_mentions: { parse: [] }, flags: 4 };
+  // Counts only, one per line in section order, minor updates last. Every
+  // line is our own number and title, so the post has a fixed size however
+  // busy the week was; maxChars stays as a guard.
+  const lines = SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
+    `${c[s]} ${lowerFirst(SECTION_TITLES[s])}`
+  );
+  const content = `${head}\n<${url}>\n\n${escapeDiscord(lines.join("\n"))}${
+    podcast ? `\n${podcast}` : ""
+  }`;
+  return {
+    content: content.slice(0, maxChars),
+    allowed_mentions: { parse: [] },
+    flags: 4,
+  };
 }
 
 // --- machine-readable copies ------------------------------------------------

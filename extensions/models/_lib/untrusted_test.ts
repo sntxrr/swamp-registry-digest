@@ -173,13 +173,13 @@ Deno.test("unverified repositories are not linked", () => {
   assertFalse(html.includes("github.com/evil"));
 });
 
-Deno.test("Discord payload can never mention anyone and escapes markdown", () => {
+Deno.test("Discord payload can never mention anyone and names no extension", () => {
   const p = renderDiscord(CFG, META, [
-    item(entry({ section: "new", name: "@a/b_c" })),
+    item(entry({ section: "new", name: "@everyone/b_c" })),
   ]);
   assertEquals(p.allowed_mentions.parse, []);
   assertEquals(p.flags, 4);
-  assertStringIncludes(p.content, "@a/b\\_c");
+  assertFalse(p.content.includes("@everyone"));
   assertStringIncludes(
     p.content,
     "<https://example.test/issues/2026-10-19.html>",
@@ -190,28 +190,21 @@ Deno.test("Discord payload can never mention anyone and escapes markdown", () =>
   );
 });
 
-Deno.test("Discord groups a collective's burst of new extensions into one line", () => {
+Deno.test("Discord post is the link then one count per line, in section order", () => {
   const items = [
     ...Array.from(
-      { length: 45 },
-      (_, i) => item(entry({ section: "new", name: `@reset/ext-${i}` })),
+      { length: 400 },
+      (_, i) => item(entry({ section: "new", name: `@n${i}/ext` })),
     ),
-    item(entry({ section: "new", name: "@solo/one" })),
+    item(entry({ section: "yanked", name: "@y/one" })),
   ];
   const p = renderDiscord(CFG, META, items);
-  assertStringIncludes(p.content, "• @reset: 45 new");
-  assertStringIncludes(p.content, "• @solo/one");
-  assertFalse(p.content.includes("ext-1"));
-});
-
-Deno.test("Discord payload stays under the length cap with hundreds of new extensions", () => {
-  const items = Array.from(
-    { length: 400 },
-    (_, i) => item(entry({ section: "new", name: `@n${i}/ext` })),
+  assertStringIncludes(
+    p.content,
+    "**\n<https://example.test/issues/2026-10-19.html>\n\n400 new extensions\n1 yanked versions",
   );
-  const p = renderDiscord(CFG, META, items);
-  assert(p.content.length <= 1900, String(p.content.length));
-  assertStringIncludes(p.content, "more");
+  assertFalse(p.content.includes("@n1/ext"));
+  assert(p.content.length < 300, String(p.content.length));
 });
 
 async function tgz(files: Record<string, string>): Promise<Uint8Array> {
@@ -300,7 +293,7 @@ Deno.test("minor modes: list names them, count only counts, drop hides them", as
   const d = (m: "list" | "count" | "drop") =>
     renderDiscord(CFG, META, items, 1900, { minorMode: m, minChangedLines: 10 })
       .content;
-  assertStringIncludes(d("list"), "1 updated (+1 minor)");
+  assertStringIncludes(d("list"), "1 updated\n1 minor updates");
   assertFalse(d("drop").includes("minor"));
 });
 
