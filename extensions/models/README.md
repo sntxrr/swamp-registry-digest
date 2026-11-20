@@ -16,7 +16,7 @@ Run in this order, normally from one workflow:
 | `collect`   | Snapshots the registry and builds the next issue from every version published or yanked in the window | reads the registry                      |
 | `classify`  | Measures each update's real code change and moves those below the threshold to "Minor updates" | downloads both versions of each update |
 | `summarize` | Summarizes each item and validates every summary                                                  | runs your summarizer command            |
-| `community` | Reads the week's podcast episodes and feed posts; a source that fails is recorded, not thrown    | reads `podcastSitemapUrl`, `communityFeedUrl` |
+| `community` | Reads the week's Swamp Weekly summaries, podcast episodes and feed posts; a source that fails is recorded, not thrown | reads `swampWeeklyDir`, `podcastSitemapUrl`, `communityFeedUrl` |
 | `render`    | Renders the issue page and JSON, index, feed, `llms.txt`, sitemap and Discord payload; `outDir` also writes them to disk for preview | none                                   |
 | `publish`   | Commits the site to `githubRepo`@`githubBranch` (default `gh-pages`) as one commit               | **only with `dryRun: false`**           |
 | `announce`  | Posts the announcement to `discordWebhookUrl`                                                    | **only with `dryRun: false`**           |
@@ -63,7 +63,31 @@ more new extensions is grouped the same way.
 
 ### Community sections
 
-Two optional sources, each off until its argument is set:
+Three optional sources, each off until its argument is set:
+
+- **`swampWeeklyDir`**: a directory of hand-written summaries of Swamp
+  Weekly, the swamp team's short Friday video on what shipped in the swamp
+  binary. The video is posted only as a Discord attachment, which an
+  unattended job cannot fetch, so someone summarises it (a local whisper
+  transcript works well) into one file per video, named for the video's date.
+  Files dated inside the window become a "What's new in swamp" section:
+
+  ```yaml
+  # 2026-11-20.yaml
+  host: Seth                 # optional
+  title: Swamp Weekly        # optional; this is the default
+  url: https://discord.com/channels/<guild>/<channel>/<message>  # optional
+  stories:                   # 1 to 12
+    - title: Restarts that keep your runs going
+      summary: A planned restart parks each run at a step boundary and resumes it.
+    - title: Many hosted workspaces behind one serve
+      summary: One service that knows about all your workspaces.
+      inProgress: true       # tagged "in progress" on the page
+  ```
+
+  Unknown keys are an error, so a typo fails loudly instead of vanishing. The
+  `url` must be https and loses its query string; a Discord attachment link
+  (`cdn.discordapp.com`) is refused because it expires. Link the message.
 
 - **`communityFeedUrl`**: an RSS feed (e.g. `https://swamp-club.com/feed.xml`).
   Posts whose `pubDate` falls in the window get a section, linked to their
@@ -73,8 +97,9 @@ Two optional sources, each off until its argument is set:
   window are read from their schema.org `PodcastEpisode` JSON-LD and linked,
   with their YouTube video when the page has one.
 
-Both sections appear above the registry sections, and the Discord
-announcement gets one `Podcast:` line per episode.
+All three appear above the registry sections, Swamp Weekly first. The
+Discord announcement gets one `What's new in swamp: N stories` line and one
+`Podcast:` line per episode.
 
 If a source cannot be read, the issue says "could not be read this week" and
 still goes out; the error is kept in the `community` data (`errors`) so the
@@ -213,7 +238,7 @@ Secrets come from a vault (`${{ vault.get(...) }}`) and are marked sensitive:
 Other useful arguments: `siteUrl` (required), `siteTitle`, `disclaimer`,
 `maxSummaries` (cap on summarizer calls per issue; the rest get metadata
 summaries), `summarizerConcurrency`, `diffBudgetChars`, `familyDiffSample`,
-`communityFeedUrl`, `podcastSitemapUrl`.
+`communityFeedUrl`, `podcastSitemapUrl`, `swampWeeklyDir`.
 
 ## Example workflow
 

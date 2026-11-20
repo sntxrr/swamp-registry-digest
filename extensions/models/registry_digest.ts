@@ -11,7 +11,7 @@
  * | `collect`   | registry, cursor, catalog    | `issue`, pending catalog        |
  * | `classify`  | `issue`, release archives    | `issue` (minor updates moved)   |
  * | `summarize` | `issue`, release archives    | `summaries`                     |
- * | `community` | `issue`, feed, podcast pages | `community`                     |
+ * | `community` | `issue`, feed, podcast, weekly | `community`                   |
  * | `render`    | issue, summaries, community  | `rendered` (+ files on disk)    |
  * | `publish`   | `rendered`                   | one commit on the Pages branch  |
  * | `announce`  | `rendered`                   | one Discord message             |
@@ -39,6 +39,8 @@
  * 6. **Community sections fail on their own.** The podcast and feed are
  *    third-party pages; if one cannot be read, the issue says so and still
  *    goes out. `community` records the error, so a caller can alert on it.
+ *    Swamp Weekly (the team's Friday video) has no public source, so it is
+ *    read from hand-written files in `swampWeeklyDir`; see `_lib/weekly.ts`.
  *
  * @module
  */
@@ -99,6 +101,7 @@ import {
 import { decodeBase64, encodeBase64 } from "jsr:@std/encoding@1.0.10/base64";
 import { publishFiles } from "./_lib/publish.ts";
 import { fetchFeed, fetchPodcast } from "./_lib/community.ts";
+import { readWeekly } from "./_lib/weekly.ts";
 
 const DEFAULT_DISCLAIMER =
   "Generated automatically from public swamp registry data. Summaries are machine-written descriptions of each change, " +
@@ -163,6 +166,9 @@ const GlobalArgsSchema = z.object({
   ),
   podcastSitemapUrl: z.string().url().optional().describe(
     "Sitemap listing /podcast/YYYY-MM-DD episode pages; episodes dated in the week get a section, e.g. https://swamp-club.com/sitemap.xml. Unset: no section",
+  ),
+  swampWeeklyDir: z.string().optional().describe(
+    'Absolute path of a directory of hand-written Swamp Weekly summaries, one YYYY-MM-DD.yaml per video; videos dated in the week get a "What\'s new in swamp" section. Unset: no section',
   ),
   siteAssetsDir: z.string().optional().describe(
     "Absolute path of a directory of static files (images, fonts, licences) published with the site at the same relative paths",
@@ -281,8 +287,21 @@ const SourceSchema = <T extends z.ZodType>(item: T) =>
     items: z.array(item),
   });
 
+const EMPTY_SOURCE = { configured: false, ok: true, error: null, items: [] };
+
 const CommunitySchema = z.object({
   slug: z.string(),
+  swampWeekly: SourceSchema(z.object({
+    date: z.string(),
+    title: z.string(),
+    host: z.string(),
+    url: z.string().nullable(),
+    stories: z.array(z.object({
+      title: z.string(),
+      summary: z.string(),
+      inProgress: z.boolean(),
+    })),
+  })).default(EMPTY_SOURCE),
   podcast: SourceSchema(z.object({
     title: z.string(),
     episodeNumber: z.number().nullable(),
@@ -298,7 +317,7 @@ const CommunitySchema = z.object({
     publishedAt: z.string(),
     summary: z.string(),
   })),
-  /** Errors across both sources, for alerting. */
+  /** Errors across every source, for alerting. */
   errors: z.array(z.string()),
 });
 
@@ -517,7 +536,7 @@ export const model = {
     },
     community: {
       description:
-        "The week's podcast episodes and feed posts, and any error reading them",
+        "The week's Swamp Weekly videos, podcast episodes and feed posts, and any error reading them",
       schema: CommunitySchema,
       lifetime: "infinite",
       garbageCollection: 20,
@@ -849,7 +868,7 @@ export const model = {
 
     community: {
       description:
-        "Read the week's podcast episodes and community feed posts. A source that fails is recorded, not thrown: the issue says it is unavailable.",
+        "Read the week's Swamp Weekly summaries, podcast episodes and community feed posts. A source that fails is recorded, not thrown: the issue says it is unavailable.",
       arguments: z.object({}),
       execute: async (_args: Seams, ctx: Ctx) => {
         const g = ctx.globalArgs;
@@ -883,6 +902,16 @@ export const model = {
             return { configured: true, ok: false, error, items: [] as T[] };
           }
         }
+        const swampWeekly = await source(
+          "swamp weekly",
+          g.swampWeeklyDir,
+          (dir) => {
+            if (!dir.startsWith("/")) {
+              throw new Error("swampWeeklyDir must be an absolute path");
+            }
+            return readWeekly(dir, w);
+          },
+        );
         const podcast = await source(
           "podcast",
           g.podcastSitemapUrl,
@@ -894,9 +923,10 @@ export const model = {
           (u) => fetchFeed(u, w, _args._fetch),
         );
         ctx.logger.info(
-          "Community for {slug}: {p} podcast episodes, {f} feed posts, {e} errors",
+          "Community for {slug}: {s} Swamp Weekly videos, {p} podcast episodes, {f} feed posts, {e} errors",
           {
             slug: issue.slug,
+            s: swampWeekly.items.length,
             p: podcast.items.length,
             f: feed.items.length,
             e: errors.length,
@@ -904,6 +934,7 @@ export const model = {
         );
         const handle = await ctx.writeResource("community", "community", {
           slug: issue.slug,
+          swampWeekly,
           podcast,
           feed,
           errors,
@@ -937,7 +968,7 @@ export const model = {
         }
         const archive = (await read<Archive>(ctx, "archive"))?.issues ?? [];
         const wantsCommunity = Boolean(
-          g.communityFeedUrl || g.podcastSitemapUrl,
+          g.communityFeedUrl || g.podcastSitemapUrl || g.swampWeeklyDir,
         );
         const comm = wantsCommunity
           ? await mustRead<CommunityData>(ctx, "community", "community")
@@ -948,7 +979,11 @@ export const model = {
           );
         }
         const community = comm
-          ? { podcast: comm.podcast, feed: comm.feed }
+          ? {
+            swampWeekly: comm.swampWeekly,
+            podcast: comm.podcast,
+            feed: comm.feed,
+          }
           : undefined;
         const cfg = siteConfig(g);
         const items = issue.items as Item[];

@@ -395,3 +395,88 @@ Deno.test("Discord: one escaped podcast line, none when unavailable or unconfigu
     !renderDiscord(CFG, META, [ITEM as never]).content.includes("Podcast"),
   );
 });
+
+const WEEKLY: Community = {
+  ...NO_COMMUNITY,
+  swampWeekly: {
+    configured: true,
+    ok: true,
+    error: null,
+    items: [{
+      date: "2026-10-23",
+      title: "Swamp Weekly",
+      host: "Seth <b>",
+      url: "https://discord.com/channels/1/2/3",
+      stories: [
+        {
+          title: "Restarts <script>alert(1)</script>",
+          summary: "Runs park at a step boundary.",
+          inProgress: false,
+        },
+        { title: "One serve", summary: "", inProgress: true },
+      ],
+    }],
+  },
+};
+
+Deno.test("issue page: Swamp Weekly first, escaped, with byline and in-progress tag", () => {
+  const html = renderIssue(CFG, META, [ITEM as never], {}, undefined, [], {
+    ...WEEKLY,
+    podcast: EPISODE.podcast,
+  });
+  const weekly = html.indexOf("<h2>What's new in swamp</h2>");
+  const pod = html.indexOf("<h2>Podcast</h2>");
+  assert(weekly > 0 && pod > weekly);
+  assert(html.includes('<a href="#swamp-weekly">What\'s new in swamp</a>'));
+  assert(
+    html.includes(
+      'From <a href="https://discord.com/channels/1/2/3" rel="nofollow noopener">Swamp Weekly</a>, Oct 23, with Seth &lt;b&gt;',
+    ),
+  );
+  assert(!html.includes("<script>alert"));
+  assert(html.includes('One serve</span> <span class="ver">· in progress'));
+  const json = JSON.parse(
+    renderIssueJson(CFG, META, [], {}, undefined, [], WEEKLY),
+  );
+  assertEquals(json.swampWeekly.items[0].stories.length, 2);
+});
+
+Deno.test("issue page: Swamp Weekly empty, unavailable, and unconfigured", () => {
+  const src = WEEKLY.swampWeekly!;
+  const empty = renderIssue(CFG, META, [], {}, undefined, [], {
+    ...WEEKLY,
+    swampWeekly: { ...src, items: [] },
+  });
+  assert(empty.includes("No Swamp Weekly this week."));
+  const down = renderIssue(CFG, META, [], {}, undefined, [], {
+    ...WEEKLY,
+    swampWeekly: { ...src, ok: false, error: "x.yaml: bad", items: [] },
+  });
+  assert(down.includes("Swamp Weekly could not be read this week."));
+  assert(!down.includes("x.yaml"));
+  const off = renderIssue(CFG, META, [], {}, undefined, [], NO_COMMUNITY);
+  assert(!off.includes("swamp-weekly"));
+  assertEquals(
+    JSON.parse(renderIssueJson(CFG, META, [], {})).swampWeekly,
+    undefined,
+  );
+});
+
+Deno.test("Discord: Swamp Weekly is one counted line of our own words", () => {
+  const p = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, WEEKLY);
+  assert(
+    p.content.endsWith("\nWhat's new in swamp: 2 stories from Swamp Weekly"),
+  );
+  assert(!p.content.includes("script"));
+  const quiet = renderDiscord(CFG, META, [], 1900, undefined, WEEKLY);
+  assert(
+    quiet.content.includes(
+      "Nothing new this week.\nWhat's new in swamp: 2 stories",
+    ),
+  );
+  const down = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, {
+    ...WEEKLY,
+    swampWeekly: { ...WEEKLY.swampWeekly!, ok: false },
+  });
+  assert(!down.content.includes("Swamp Weekly"));
+});
