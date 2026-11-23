@@ -504,8 +504,25 @@ function renderItem(
 /** "Pre-releases (beta and RC)" → "pre-releases (beta and RC)". */
 const lowerFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
-function countChips(c: Record<Section, number>): string {
+/** Swamp Weekly stories that shipped; "in progress" ones are not updates yet. */
+function binaryUpdates(c: Community): number {
+  const s = c.swampWeekly;
+  return s?.configured && s.ok
+    ? s.items.flatMap((e) => e.stories).filter((st) => !st.inProgress).length
+    : 0;
+}
+
+const binaryLabel = (n: number) =>
+  `swamp binary ${n === 1 ? "update" : "updates"}`;
+
+function countChips(c: Record<Section, number>, binary: number): string {
   return `<p class="counts">${
+    binary
+      ? `<a href="#swamp-weekly"><b>${binary}</b> <span>${
+        binaryLabel(binary)
+      }</span></a>`
+      : ""
+  }${
     SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
       `<a href="#${s}"><b>${c[s]}</b> <span>${
         escapeHtml(lowerFirst(SECTION_TITLES[s]))
@@ -563,6 +580,7 @@ export function renderIssue(
       its.map((i) => renderItem(cfg, i, summaries)).join("\n")
     }</ul></section>`;
   }).join("\n");
+  const binary = binaryUpdates(community);
   const before = earlier(archive, meta.slug);
   const prev = before[0];
   const nav = `${
@@ -606,7 +624,7 @@ export function renderIssue(
     }</ul></section>`
     : "";
   const body = `<h1>Week of ${escapeHtml(range)}</h1>
-${items.length ? countChips(c) : ""}
+${items.length || binary ? countChips(c, binary) : ""}
 ${contents}
 ${renderCommunity(community)}
 ${items.length ? sections : `<p class="empty">Nothing new this week.</p>`}
@@ -748,31 +766,24 @@ export function renderDiscord(
         : [];
     }).join("")
     : "";
-  // Our own words and a count: the stories are on the issue page.
-  const stories = community.swampWeekly?.ok
-    ? community.swampWeekly.items.reduce((n, e) => n + e.stories.length, 0)
-    : 0;
-  const weekly = stories
-    ? `\nWhat's new in the swamp binary: ${stories} ${
-      stories === 1 ? "story" : "stories"
-    } from Swamp Weekly`
-    : "";
-  if (items.length === 0) {
+  const binary = binaryUpdates(community);
+  if (items.length === 0 && !binary) {
     return {
-      content: `${head}\nNothing new this week.${weekly}${podcast}\n<${url}>`,
+      content: `${head}\nNothing new this week.${podcast}\n<${url}>`,
       allowed_mentions: { parse: [] },
       flags: 4,
     };
   }
-  // Counts only, one per line in section order, minor updates last. Every
+  // Counts only, one per line: the swamp binary, then the registry in section
+  // order, minor updates last. Every
   // line is our own number and title, so the post has a fixed size however
   // busy the week was; maxChars stays as a guard.
   const lines = SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
     `${c[s]} ${lowerFirst(SECTION_TITLES[s])}`
   );
-  const extra = `${weekly}${podcast}`;
+  if (binary) lines.unshift(`${binary} ${binaryLabel(binary)}`);
   const content = `${head}\n<${url}>\n\n${escapeDiscord(lines.join("\n"))}${
-    extra ? `\n${extra}` : ""
+    podcast ? `\n${podcast}` : ""
   }`;
   return {
     content: content.slice(0, maxChars),

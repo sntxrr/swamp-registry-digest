@@ -97,9 +97,10 @@ Three optional sources, each off until its argument is set:
   window are read from their schema.org `PodcastEpisode` JSON-LD and linked,
   with their YouTube video when the page has one.
 
-All three appear above the registry sections, Swamp Weekly first. The
-Discord announcement gets one `What's new in the swamp binary: N stories` line and one
-`Podcast:` line per episode.
+All three appear above the registry sections, Swamp Weekly first. Shipped
+stories (not `inProgress` ones) are also the first count on the page and in
+the Discord announcement, as `N swamp binary updates`. The announcement gets
+one `Podcast:` line per episode.
 
 If a source cannot be read, the issue says "could not be read this week" and
 still goes out; the error is kept in the `community` data (`errors`) so the
