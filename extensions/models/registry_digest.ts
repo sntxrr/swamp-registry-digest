@@ -512,7 +512,7 @@ export const model = {
   type: "@sntxrr/registry-digest",
   description:
     "Weekly digest of new, updated, pre-release, yanked and removed swamp registry extensions, published as a static site and announced on Discord",
-  version: "2026.10.26.3",
+  version: "2026.11.20.1",
   globalArguments: GlobalArgsSchema,
   resources: {
     issue: {
