@@ -466,23 +466,48 @@ Deno.test("issue page: Swamp Weekly empty, unavailable, and unconfigured", () =>
   );
 });
 
-Deno.test("Discord: Swamp Weekly is one counted line of our own words", () => {
-  const p = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, WEEKLY);
+Deno.test("Discord: shipped Swamp Weekly stories are the first count", () => {
+  const of = (items: unknown[], c: Community) =>
+    renderDiscord(CFG, META, items as never, 1900, undefined, c).content;
+  // Two stories, one of them in progress.
+  const busy = of([ITEM], WEEKLY);
+  assert(busy.includes("\n\n1 swamp binary update\n1 new extensions"));
+  assert(!busy.includes("script"));
+  // A quiet registry week with binary news is not "nothing new".
+  const quiet = of([], WEEKLY);
+  assert(quiet.endsWith("\n\n1 swamp binary update"));
+  assert(!quiet.includes("Nothing new"));
+  const src = WEEKLY.swampWeekly!;
   assert(
-    p.content.endsWith(
-      "\nWhat's new in the swamp binary: 2 stories from Swamp Weekly",
+    !of([ITEM], { ...WEEKLY, swampWeekly: { ...src, ok: false } }).includes(
+      "binary",
     ),
   );
-  assert(!p.content.includes("script"));
-  const quiet = renderDiscord(CFG, META, [], 1900, undefined, WEEKLY);
+  const ep = src.items[0];
+  const stories = ep.stories.map((s) => ({ ...s, inProgress: false }));
+  const both = { ...src, items: [{ ...ep, stories }] };
   assert(
-    quiet.content.includes(
-      "Nothing new this week.\nWhat's new in the swamp binary: 2 stories",
+    of([ITEM], { ...WEEKLY, swampWeekly: both }).includes(
+      "\n2 swamp binary updates\n",
     ),
   );
-  const down = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, {
-    ...WEEKLY,
-    swampWeekly: { ...WEEKLY.swampWeekly!, ok: false },
-  });
-  assert(!down.content.includes("Swamp Weekly"));
+});
+
+Deno.test("issue page: binary updates are the first count, linked to the section", () => {
+  const chip =
+    '<p class="counts"><a href="#swamp-weekly"><b>1</b> <span>swamp binary update</span></a>';
+  for (const items of [[ITEM], []]) {
+    const html = renderIssue(
+      CFG,
+      META,
+      items as never,
+      {},
+      undefined,
+      [],
+      WEEKLY,
+    );
+    assert(html.includes(chip));
+  }
+  const off = renderIssue(CFG, META, [ITEM as never], {});
+  assert(!off.includes("binary update"));
 });
