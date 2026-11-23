@@ -424,10 +424,14 @@ Deno.test("issue page: Swamp Weekly first, escaped, with byline and in-progress 
     ...WEEKLY,
     podcast: EPISODE.podcast,
   });
-  const weekly = html.indexOf("<h2>What's new in swamp</h2>");
+  const weekly = html.indexOf("<h2>What's new in the swamp binary</h2>");
   const pod = html.indexOf("<h2>Podcast</h2>");
   assert(weekly > 0 && pod > weekly);
-  assert(html.includes('<a href="#swamp-weekly">What\'s new in swamp</a>'));
+  assert(
+    html.includes(
+      '<a href="#swamp-weekly">What\'s new in the swamp binary</a>',
+    ),
+  );
   assert(
     html.includes(
       'From <a href="https://discord.com/channels/1/2/3" rel="nofollow noopener">Swamp Weekly</a>, Oct 23, with Seth &lt;b&gt;',
@@ -465,13 +469,15 @@ Deno.test("issue page: Swamp Weekly empty, unavailable, and unconfigured", () =>
 Deno.test("Discord: Swamp Weekly is one counted line of our own words", () => {
   const p = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, WEEKLY);
   assert(
-    p.content.endsWith("\nWhat's new in swamp: 2 stories from Swamp Weekly"),
+    p.content.endsWith(
+      "\nWhat's new in the swamp binary: 2 stories from Swamp Weekly",
+    ),
   );
   assert(!p.content.includes("script"));
   const quiet = renderDiscord(CFG, META, [], 1900, undefined, WEEKLY);
   assert(
     quiet.content.includes(
-      "Nothing new this week.\nWhat's new in swamp: 2 stories",
+      "Nothing new this week.\nWhat's new in the swamp binary: 2 stories",
     ),
   );
   const down = renderDiscord(CFG, META, [ITEM as never], 1900, undefined, {

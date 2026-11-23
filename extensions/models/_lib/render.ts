@@ -300,7 +300,7 @@ function renderWeekly(s: CommunitySource<WeeklyEpisode>): string {
         ).join("\n")
       }</ul>`;
     }).join("\n");
-  return `<section class="community" id="swamp-weekly"><h2>What's new in swamp</h2>${body}</section>`;
+  return `<section class="community" id="swamp-weekly"><h2>What's new in the swamp binary</h2>${body}</section>`;
 }
 
 function renderCommunity(c: Community): string {
@@ -578,7 +578,7 @@ export function renderIssue(
   // their counts above.
   const toc: string[] = [];
   if (community.swampWeekly?.configured) {
-    toc.push(`<a href="#swamp-weekly">What's new in swamp</a>`);
+    toc.push(`<a href="#swamp-weekly">What's new in the swamp binary</a>`);
   }
   if (community.podcast.configured) {
     toc.push(`<a href="#podcast">Podcast</a>`);
@@ -753,7 +753,7 @@ export function renderDiscord(
     ? community.swampWeekly.items.reduce((n, e) => n + e.stories.length, 0)
     : 0;
   const weekly = stories
-    ? `\nWhat's new in swamp: ${stories} ${
+    ? `\nWhat's new in the swamp binary: ${stories} ${
       stories === 1 ? "story" : "stories"
     } from Swamp Weekly`
     : "";

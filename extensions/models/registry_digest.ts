@@ -168,7 +168,7 @@ const GlobalArgsSchema = z.object({
     "Sitemap listing /podcast/YYYY-MM-DD episode pages; episodes dated in the week get a section, e.g. https://swamp-club.com/sitemap.xml. Unset: no section",
   ),
   swampWeeklyDir: z.string().optional().describe(
-    'Absolute path of a directory of hand-written Swamp Weekly summaries, one YYYY-MM-DD.yaml per video; videos dated in the week get a "What\'s new in swamp" section. Unset: no section',
+    'Absolute path of a directory of hand-written Swamp Weekly summaries, one YYYY-MM-DD.yaml per video; videos dated in the week get a "What\'s new in the swamp binary" section. Unset: no section',
   ),
   siteAssetsDir: z.string().optional().describe(
     "Absolute path of a directory of static files (images, fonts, licences) published with the site at the same relative paths",
