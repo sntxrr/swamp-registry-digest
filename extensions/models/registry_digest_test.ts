@@ -394,6 +394,50 @@ Deno.test("community with no sources configured touches nothing", async () => {
   ]);
 });
 
+Deno.test("community reads Swamp Weekly files for the issue's week", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(
+      `${dir}/2026-10-23.yaml`,
+      "host: Seth\nstories:\n  - title: Restarts keep runs going\n",
+    );
+    await Deno.writeTextFile(
+      `${dir}/2026-10-30.yaml`,
+      "stories:\n  - title: Next week\n",
+    );
+    const f: typeof fetch = () => {
+      throw new Error("network touched");
+    };
+    const { context, getWrittenResources } = ctx({ issue: ISSUE_ONLY }, {
+      ...GLOBAL,
+      swampWeeklyDir: dir,
+    });
+    await model.methods.community.execute({ _fetch: f }, context);
+    const c = getWrittenResources().find((r) => r.name === "community")!
+      .data as Record<string, any>;
+    assertEquals(c.swampWeekly.configured, true);
+    assertEquals(
+      c.swampWeekly.items.map((e: any) => e.stories[0].title),
+      ["Restarts keep runs going"],
+    );
+    assertEquals([c.podcast.configured, c.errors], [false, []]);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("community records a bad Swamp Weekly file as a failed source", async () => {
+  const { context, getWrittenResources } = ctx({ issue: ISSUE_ONLY }, {
+    ...GLOBAL,
+    swampWeeklyDir: "/nonexistent/swamp-weekly",
+  });
+  await model.methods.community.execute({}, context);
+  const c = getWrittenResources().find((r) => r.name === "community")!
+    .data as Record<string, any>;
+  assertEquals(c.swampWeekly.ok, false);
+  assertStringIncludes(c.errors[0], "swamp weekly: ");
+});
+
 Deno.test("render requires this week's community data once a source is configured", async () => {
   const sums = {
     slug: "2026-10-19",

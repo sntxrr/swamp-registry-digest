@@ -12,6 +12,7 @@
 
 import { type Item, itemId, type Section, SECTION_ORDER } from "./digest.ts";
 import type { FeedPost, PodcastEpisode } from "./community.ts";
+import type { WeeklyEpisode } from "./weekly.ts";
 
 export interface IssueMeta {
   slug: string;
@@ -70,6 +71,8 @@ export interface CommunitySource<T> {
 }
 
 export interface Community {
+  /** Swamp Weekly, summarised by hand; absent means not configured. */
+  swampWeekly?: CommunitySource<WeeklyEpisode>;
   podcast: CommunitySource<PodcastEpisode>;
   feed: CommunitySource<FeedPost>;
 }
@@ -265,10 +268,46 @@ function earlier(archive: ArchiveEntry[], slug: string): ArchiveEntry[] {
   );
 }
 
+/** Short date for a byline, e.g. "Nov 20". */
+const dayMonth = (d: string) =>
+  new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+function renderWeekly(s: CommunitySource<WeeklyEpisode>): string {
+  const body = !s.ok
+    ? `<p class="empty">Swamp Weekly could not be read this week.</p>`
+    : s.items.length === 0
+    ? `<p class="empty">No Swamp Weekly this week.</p>`
+    : s.items.map((e) => {
+      const url = safeUrl(e.url);
+      const name = url
+        ? `<a href="${escapeHtml(url)}" rel="nofollow noopener">${
+          escapeHtml(e.title)
+        }</a>`
+        : escapeHtml(e.title);
+      return `<p class="ver">From ${name}, ${escapeHtml(dayMonth(e.date))}${
+        e.host ? `, with ${escapeHtml(e.host)}` : ""
+      }</p><ul>${
+        e.stories.map((st) =>
+          `<li><span class="name">${escapeHtml(st.title)}</span>${
+            st.inProgress ? ` <span class="ver">· in progress</span>` : ""
+          }${
+            st.summary ? `<p class="sum">${escapeHtml(st.summary)}</p>` : ""
+          }</li>`
+        ).join("\n")
+      }</ul>`;
+    }).join("\n");
+  return `<section class="community" id="swamp-weekly"><h2>What's new in swamp</h2>${body}</section>`;
+}
+
 function renderCommunity(c: Community): string {
   const parts: string[] = [];
   const unavailable = (what: string) =>
     `<p class="empty">The ${what} could not be read this week.</p>`;
+  if (c.swampWeekly?.configured) parts.push(renderWeekly(c.swampWeekly));
   if (c.podcast.configured) {
     const body = !c.podcast.ok
       ? unavailable("podcast")
@@ -538,6 +577,9 @@ export function renderIssue(
   // Community sections get plain links; registry sections are reached from
   // their counts above.
   const toc: string[] = [];
+  if (community.swampWeekly?.configured) {
+    toc.push(`<a href="#swamp-weekly">What's new in swamp</a>`);
+  }
   if (community.podcast.configured) {
     toc.push(`<a href="#podcast">Podcast</a>`);
   }
@@ -706,9 +748,18 @@ export function renderDiscord(
         : [];
     }).join("")
     : "";
+  // Our own words and a count: the stories are on the issue page.
+  const stories = community.swampWeekly?.ok
+    ? community.swampWeekly.items.reduce((n, e) => n + e.stories.length, 0)
+    : 0;
+  const weekly = stories
+    ? `\nWhat's new in swamp: ${stories} ${
+      stories === 1 ? "story" : "stories"
+    } from Swamp Weekly`
+    : "";
   if (items.length === 0) {
     return {
-      content: `${head}\nNothing new this week.${podcast}\n<${url}>`,
+      content: `${head}\nNothing new this week.${weekly}${podcast}\n<${url}>`,
       allowed_mentions: { parse: [] },
       flags: 4,
     };
@@ -719,8 +770,9 @@ export function renderDiscord(
   const lines = SECTION_ORDER.filter((s) => c[s] > 0).map((s) =>
     `${c[s]} ${lowerFirst(SECTION_TITLES[s])}`
   );
+  const extra = `${weekly}${podcast}`;
   const content = `${head}\n<${url}>\n\n${escapeDiscord(lines.join("\n"))}${
-    podcast ? `\n${podcast}` : ""
+    extra ? `\n${extra}` : ""
   }`;
   return {
     content: content.slice(0, maxChars),
@@ -801,6 +853,9 @@ export function renderIssueJson(
         }),
       }];
     }),
+    swampWeekly: community.swampWeekly
+      ? source(community.swampWeekly)
+      : undefined,
     podcast: source(community.podcast),
     feed: source(community.feed),
   };
