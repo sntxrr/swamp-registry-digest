@@ -70,7 +70,7 @@ Three optional sources, each off until its argument is set:
   binary. The video is posted only as a Discord attachment, which an
   unattended job cannot fetch, so someone summarises it (a local whisper
   transcript works well) into one file per video, named for the video's date.
-  Files dated inside the window become a "What's new in swamp" section:
+  Files dated inside the window become a "What's new in the swamp binary" section:
 
   ```yaml
   # 2026-11-20.yaml
@@ -98,7 +98,7 @@ Three optional sources, each off until its argument is set:
   with their YouTube video when the page has one.
 
 All three appear above the registry sections, Swamp Weekly first. The
-Discord announcement gets one `What's new in swamp: N stories` line and one
+Discord announcement gets one `What's new in the swamp binary: N stories` line and one
 `Podcast:` line per episode.
 
 If a source cannot be read, the issue says "could not be read this week" and
